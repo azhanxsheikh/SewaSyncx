@@ -1,0 +1,9 @@
+{
+  "name": "clients",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "PORT=3002 vite --config ../../vite.config.ts",
+    "build": "vite build --config ../../vite.config.ts"
+  }
+}
