@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useDispatch } from '../../context/DispatchContext';
 
 interface Props { onOpenAlerts: () => void; onOpenActive: () => void; }
@@ -6,6 +7,14 @@ export default function TechDashboard({ onOpenAlerts, onOpenActive }: Props) {
   const { job, technicianOnline, setTechOnline, jobHistory } = useDispatch();
   const alert = job?.status === 'requested' || job?.status === 'searching';
   const active = job && ['accepted', 'en-route', 'arrived', 'in-progress'].includes(job.status);
+  useEffect(() => {
+    console.log('[technician] dashboard request state', {
+      id: job?.id ?? null,
+      status: job?.status ?? null,
+      alert,
+      visibleToRahul: Boolean(alert),
+    });
+  }, [alert, job?.id, job?.status]);
   return <div className="space-y-6">
     <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm text-slate-400">Wednesday, September 9, 2026</p><h1 className="mt-1 font-display text-3xl font-800">Good morning, Rahul</h1></div><button onClick={() => setTechOnline(!technicianOnline)} className={`tech-online-pulse rounded-full px-4 py-2 text-sm font-700 ${technicianOnline ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-400'}`}>{technicianOnline ? '● Online' : '○ Offline'}</button></div>
     <div className="grid gap-4 sm:grid-cols-3">

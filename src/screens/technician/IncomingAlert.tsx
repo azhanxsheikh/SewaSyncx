@@ -8,7 +8,11 @@ export default function IncomingAlert({ onAccepted }: { onAccepted: () => void }
   useEffect(() => { if (!isAlert) return; const timer = window.setInterval(() => setSeconds(value => Math.max(0, value - 1)), 1000); return () => window.clearInterval(timer); }, [isAlert]);
   useEffect(() => { if (seconds === 0 && isAlert) declineJob(); }, [seconds, isAlert]);
   if (!job || !isAlert) return <div className="rounded-2xl border border-slate-800 bg-slate-900 p-12 text-center text-slate-400">No incoming requests right now.</div>;
-  const accept = () => { acceptJob(); onAccepted(); };
+  const accept = () => {
+    console.log('[technician] request accepted', { id: job?.id, statusBefore: job?.status });
+    acceptJob();
+    onAccepted();
+  };
   return <div className="mx-auto max-w-2xl space-y-5">
     <div className="flex items-center justify-between"><div><p className="text-sm text-red-300">Emergency dispatch request</p><h1 className="font-display text-3xl font-800">Review and respond</h1></div><div className="relative flex h-20 w-20 items-center justify-center text-red-300"><svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeOpacity=".2" strokeWidth="6" /><circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="6" strokeDasharray="283" strokeDashoffset={`${283 * (1 - seconds / 45)}`} strokeLinecap="round" /></svg><span className="font-display text-2xl font-800">{seconds}</span></div></div>
     <div className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900">

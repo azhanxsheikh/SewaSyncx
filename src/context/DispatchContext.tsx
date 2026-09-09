@@ -4,6 +4,34 @@ import type { ConfirmedLocation, DispatchAttachment, DispatchEvent, DispatchJob,
 const CHANNEL_NAME = 'sos-dispatch';
 const STORAGE_KEY = 'sos-dispatch-job';
 const EVENT_KEY = 'sos-dispatch-event';
+const DISPATCH_BRIDGE_URL = 'http://localhost:3000/__sos_dispatch';
+
+function canUseDispatchBridge() {
+  return typeof window !== 'undefined' && window.location.hostname === 'localhost';
+}
+
+async function publishToDispatchBridge(event: DispatchEvent) {
+  if (!canUseDispatchBridge()) return;
+  try {
+    await fetch(DISPATCH_BRIDGE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event),
+    });
+    console.log('[dispatch] bridge published', event.type, event.job?.id ?? event.requestId);
+  } catch (error) {
+    console.warn('[dispatch] bridge publish failed', error);
+  }
+}
+
+function applyDispatchEvent(current: DispatchJob | null, incoming: DispatchEvent) {
+  if (incoming.job) return incoming.job;
+  if (incoming.type === 'NEW_REQUEST' && incoming.request) return incoming.request;
+  if ((incoming.type === 'ACCEPTED' || incoming.type === 'STATUS') && incoming.requestId && current?.id === incoming.requestId) {
+    return { ...current, status: normalizeStatus(incoming.status), updatedAt: Date.now(), ...(incoming.job ?? {}) };
+  }
+  return current;
+}
 
 interface DispatchContextValue {
   job: DispatchJob | null;
@@ -106,6 +134,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
       channel = new BroadcastChannel(CHANNEL_NAME);
       channel.onmessage = (message: MessageEvent<DispatchEvent>) => {
         const incoming = message.data;
+        console.log('[dispatch] BroadcastChannel received', incoming?.type, incoming?.job?.id ?? incoming?.requestId);
         if (incoming?.job) {
           setJob(incoming.job);
           return;
@@ -140,8 +169,25 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
       }
     };
     window.addEventListener('storage', onStorage);
+    let disposed = false;
+    const pollBridge = async () => {
+      if (!canUseDispatchBridge()) return;
+      try {
+        const response = await fetch(DISPATCH_BRIDGE_URL, { cache: 'no-store' });
+        if (!response.ok || response.status === 204) return;
+        const incoming = await response.json() as DispatchEvent;
+        console.log('[dispatch] bridge received', incoming?.type, incoming?.job?.id ?? incoming?.requestId);
+        if (!disposed) setJob(current => applyDispatchEvent(current, incoming));
+      } catch (error) {
+        console.warn('[dispatch] bridge poll failed', error);
+      }
+    };
+    void pollBridge();
+    const bridgeTimer = window.setInterval(pollBridge, 1000);
     return () => {
+      disposed = true;
       channel?.close();
+      window.clearInterval(bridgeTimer);
       window.removeEventListener('storage', onStorage);
     };
   }, []);
@@ -152,6 +198,8 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
       const next = { ...current, ...patch, updatedAt: Date.now() };
       writeStorage(STORAGE_KEY, next);
       publish({ type: 'job-updated', job: next });
+      void publishToDispatchBridge({ type: 'job-updated', job: next });
+      console.log('[dispatch] job updated', { id: next.id, status: next.status, patch });
       return next;
     });
   }, []);
@@ -175,6 +223,8 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
     setJob(next);
     writeStorage(STORAGE_KEY, next);
     publish({ type: 'job-created', job: next });
+    void publishToDispatchBridge({ type: 'job-created', job: next });
+    console.log('[dispatch] job created', { id: next.id, service: next.service, priority: next.priority, status: next.status });
     return next;
   }, []);
 

@@ -23,10 +23,19 @@ export default function SOSConfirmation({ navigate, selectedService, priority }:
     submittedRef.current = true;
     try {
       if (dispatch?.submitSOSRequest) {
-        dispatch.submitSOSRequest({ service: safeService, priority: safePriority });
+        const request = dispatch.submitSOSRequest({ service: safeService, priority: safePriority });
+        console.log('[client] SOS request submitted', {
+          id: request.id,
+          service: request.service,
+          priority: request.priority,
+          status: request.status,
+          location: request.location,
+        });
+      } else {
+        console.error('[client] SOS request not submitted: dispatch provider unavailable');
       }
     } catch (error) {
-      console.error('Unable to sync SOS request with dispatch bus', error);
+      console.error('[client] SOS request submission failed', error);
     }
   }, [dispatch, safePriority, safeService]);
 

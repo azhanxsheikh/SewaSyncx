@@ -1,9 +1,67 @@
 import { defineConfig, type HtmlTagDescriptor, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import fs from 'node:fs'
 import path from 'node:path'
+import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import siteConfiguration from './.figma/make/site.json'
+
+const dispatchStatePath = path.resolve(__dirname, '.figma/make/dispatch-state.json')
+
+function dispatchBridge(): Plugin {
+  const readState = () => {
+    try {
+      return JSON.parse(fs.readFileSync(dispatchStatePath, 'utf8'))
+    } catch {
+      return null
+    }
+  }
+
+  const readBody = (request: IncomingMessage): Promise<string> => new Promise((resolve, reject) => {
+    let body = ''
+    request.on('data', chunk => { body += chunk })
+    request.on('end', () => resolve(body))
+    request.on('error', reject)
+  })
+
+  return {
+    name: 'sos-dispatch-bridge',
+    configureServer(server) {
+      server.middlewares.use('/__sos_dispatch', async (request, response: ServerResponse) => {
+        response.setHeader('Access-Control-Allow-Origin', '*')
+        response.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+        response.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        if (request.method === 'OPTIONS') {
+          response.statusCode = 204
+          response.end()
+          return
+        }
+        if (request.method === 'GET') {
+          const state = readState()
+          response.statusCode = state ? 200 : 204
+          response.setHeader('Content-Type', 'application/json')
+          response.end(state ? JSON.stringify(state) : '')
+          return
+        }
+        if (request.method === 'POST') {
+          try {
+            const body = JSON.parse(await readBody(request))
+            fs.writeFileSync(dispatchStatePath, JSON.stringify(body), 'utf8')
+            response.statusCode = 204
+            response.end()
+          } catch {
+            response.statusCode = 400
+            response.end('Invalid dispatch payload')
+          }
+          return
+        }
+        response.statusCode = 405
+        response.end()
+      })
+    },
+  }
+}
 
 // Vite config — https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -19,6 +77,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
+      dispatchBridge(),
       figmaSiteConfiguration(siteConfiguration),
       figmaErrorOverlayReplay(),
       figmaReactRefreshBoundaryFallback(),

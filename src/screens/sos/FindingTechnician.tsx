@@ -14,6 +14,7 @@ export default function FindingTechnician({ navigate }: Props) {
   const [techProgress, setTechProgress] = useState(0);
 
   useEffect(() => {
+    console.log('[client] finding technician screen', { requestId: job?.id, status: job?.status });
     if (job?.status === 'requested') setStatus('searching');
     const interval = setInterval(() => {
       setElapsed(e => e + 1);
@@ -23,6 +24,7 @@ export default function FindingTechnician({ navigate }: Props) {
   }, []);
 
   useEffect(() => {
+    if (activeRequest) console.log('[client] request state received', { id: activeRequest.id, status: activeRequest.status });
     if (activeRequest?.status === 'accepted' || activeRequest?.status === 'en-route') {
       try {
         navigate('sos-assigned');
