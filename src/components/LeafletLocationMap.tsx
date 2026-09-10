@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css';
 interface Props {
   onLocationChange?: (location: string) => void;
   initialAddress?: string;
+  activeCoordinates?: { latitude: number; longitude: number; accuracy?: number };
   heightClass?: string;
   className?: string;
   showRoute?: boolean;
@@ -13,16 +14,35 @@ interface Props {
 
 const DEFAULT_LOCATION: L.LatLngExpression = [28.608, 77.437];
 
-export default function LeafletLocationMap({ onLocationChange, initialAddress, heightClass = 'h-56 min-h-[250px]', className = '', showRoute = false, onMapReady }: Props) {
+export default function LeafletLocationMap({ onLocationChange, initialAddress, activeCoordinates, heightClass = 'h-56 min-h-[250px]', className = '', showRoute = false, onMapReady }: Props) {
   const mapElement = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
+  const accuracyCircleRef = useRef<L.Circle | null>(null);
   const [address, setAddress] = useState(initialAddress || 'B-204, Gaur City 2, Greater Noida West');
   const [locating, setLocating] = useState(false);
 
   useEffect(() => {
     if (initialAddress) setAddress(initialAddress);
   }, [initialAddress]);
+
+  useEffect(() => {
+    const coordinates = activeCoordinates;
+    const map = mapRef.current;
+    const marker = markerRef.current;
+    if (!coordinates || !map || !marker) return;
+    const point: L.LatLngExpression = [coordinates.latitude, coordinates.longitude];
+    map.setView(point, 16);
+    marker.setLatLng(point);
+    accuracyCircleRef.current?.remove();
+    accuracyCircleRef.current = L.circle(point, {
+      radius: Math.max(coordinates.accuracy ?? 0, 1),
+      color: '#dc2626',
+      fillColor: '#dc2626',
+      fillOpacity: 0.12,
+      weight: 1,
+    }).addTo(map);
+  }, [activeCoordinates?.accuracy, activeCoordinates?.latitude, activeCoordinates?.longitude]);
 
   useEffect(() => {
     if (!mapElement.current || mapRef.current) return;
@@ -44,7 +64,10 @@ export default function LeafletLocationMap({ onLocationChange, initialAddress, h
     marker.bindTooltip('Drag to set your service location', { direction: 'top', offset: [0, -24] });
     marker.on('dragend', () => {
       const position = marker.getLatLng();
-      void reverseGeocode(position.lat, position.lng, setAddress, onLocationChange);
+      void reverseGeocode(position.lat, position.lng).then(value => {
+        setAddress(value);
+        onLocationChange?.(value);
+      });
     });
     if (showRoute) {
       L.polyline([DEFAULT_LOCATION, [28.61, 77.45]], { color: '#2563eb', dashArray: '8 6', weight: 4 }).addTo(map);
@@ -58,6 +81,7 @@ export default function LeafletLocationMap({ onLocationChange, initialAddress, h
       map.remove();
       mapRef.current = null;
       markerRef.current = null;
+      accuracyCircleRef.current = null;
     };
   }, [onLocationChange, onMapReady, showRoute]);
 
@@ -66,13 +90,22 @@ export default function LeafletLocationMap({ onLocationChange, initialAddress, h
       setAddress('B-204, Gaur City 2, Greater Noida West');
       return;
     }
+    if (activeCoordinates) {
+      const point: L.LatLngExpression = [activeCoordinates.latitude, activeCoordinates.longitude];
+      mapRef.current.setView(point, 16);
+      markerRef.current.setLatLng(point);
+      return;
+    }
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       position => {
         const point: L.LatLngExpression = [position.coords.latitude, position.coords.longitude];
         mapRef.current?.setView(point, 16);
         markerRef.current?.setLatLng(point);
-        void reverseGeocode(position.coords.latitude, position.coords.longitude, setAddress, onLocationChange).finally(() => setLocating(false));
+        void reverseGeocode(position.coords.latitude, position.coords.longitude).then(value => {
+          setAddress(value);
+          onLocationChange?.(value);
+        }).finally(() => setLocating(false));
       },
       () => {
         setAddress('B-204, Gaur City 2, Greater Noida West');
@@ -96,22 +129,13 @@ export default function LeafletLocationMap({ onLocationChange, initialAddress, h
   );
 }
 
-async function reverseGeocode(
-  latitude: number,
-  longitude: number,
-  setAddress: (value: string) => void,
-  onLocationChange?: (value: string) => void,
-) {
+export async function reverseGeocode(latitude: number, longitude: number) {
   try {
     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`);
     if (!response.ok) throw new Error('Reverse geocoding failed');
     const data = await response.json() as { display_name?: string };
-    const value = data.display_name || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
-    setAddress(value);
-    onLocationChange?.(value);
+    return data.display_name || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
   } catch {
-    const value = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
-    setAddress(value);
-    onLocationChange?.(value);
+    return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
   }
 }

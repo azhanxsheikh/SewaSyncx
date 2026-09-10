@@ -162,16 +162,6 @@ export default function App() {
         setSelectedMember={setSelectedFamilyMember}
       />
     ),
-    'family-tracking': (
-      <FamilySOS
-        navigate={navigate}
-        subScreen="tracking"
-        setSubScreen={setFamilySubScreen}
-        selectedMember={selectedFamilyMember}
-        setSelectedMember={setSelectedFamilyMember}
-      />
-    ),
-
     'scheduled-category': (
       <ScheduledBooking
         navigate={navigate}

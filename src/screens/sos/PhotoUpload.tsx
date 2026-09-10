@@ -1,7 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Screen } from '../../data/mockData';
 import Header, { SOSProgress } from '../../components/Header';
 import { resizeFileToBase64, useDispatch } from '../../context/DispatchContext';
+import type { DispatchAttachment } from '../../types/dispatch';
 
 interface Props {
   navigate: (s: Screen) => void;
@@ -14,20 +15,40 @@ const symptoms = [
 ];
 
 export default function PhotoUpload({ navigate, onBack }: Props) {
-  const { addAttachments } = useDispatch();
+  const { updateSosDraft } = useDispatch();
   const fileInput = useRef<HTMLInputElement>(null);
-  const [selected, setSelected] = useState<string[]>([]);
-  const [uploaded, setUploaded] = useState(false);
+  const [form, setForm] = useState({ tags: [] as string[], description: '', uploaded: false, uploading: false, error: '', files: [] as File[], attachments: [] as DispatchAttachment[] });
+
+  useEffect(() => {
+    updateSosDraft({ symptoms: [], description: '', attachments: [] });
+  }, [updateSosDraft]);
 
   const toggleSymptom = (s: string) => {
-    setSelected(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
+    setForm(prev => {
+      const tags = prev.tags.includes(s) ? prev.tags.filter(x => x !== s) : [...prev.tags, s];
+      updateSosDraft({ symptoms: tags });
+      return { ...prev, tags };
+    });
   };
 
   const onFile = async (file?: File) => {
     if (!file) return;
-    const dataUrl = await resizeFileToBase64(file);
-    addAttachments([{ id: `${file.name}-${Date.now()}`, name: file.name, type: file.type.startsWith('video/') ? 'video' : 'image', dataUrl }]);
-    setUploaded(true);
+    if (file.size > 50 * 1024 * 1024) {
+      setForm(prev => ({ ...prev, error: 'Files must be smaller than 50 MB.' }));
+      return;
+    }
+    setForm(prev => ({ ...prev, uploading: true, error: '', files: [...prev.files, file] }));
+    try {
+      const dataUrl = await resizeFileToBase64(file);
+      const attachment: DispatchAttachment = { id: `${file.name}-${Date.now()}`, name: file.name, type: file.type.startsWith('video/') ? 'video' : 'image', dataUrl };
+      setForm(prev => {
+        const attachments = [...prev.attachments, attachment];
+        updateSosDraft({ attachments });
+        return { ...prev, attachments, uploaded: true, uploading: false };
+      });
+    } catch {
+      setForm(prev => ({ ...prev, uploading: false, error: 'Upload failed. Try again or skip this file.' }));
+    }
   };
 
   return (
@@ -70,12 +91,12 @@ export default function PhotoUpload({ navigate, onBack }: Props) {
         </div>
 
         {/* Uploaded thumbnail */}
-        {uploaded && (
+        {form.uploaded && (
           <div className="mt-3 flex gap-2 fade-in">
             <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-amber-100 border-2 border-emerald-400 flex items-center justify-center">
-              <span className="text-3xl">⚡</span>
+              <span className="text-3xl">{form.files[form.files.length - 1]?.type.startsWith('video/') ? '🎥' : '⚡'}</span>
               <button
-                onClick={() => setUploaded(false)}
+                onClick={() => setForm(prev => ({ ...prev, uploaded: false }))}
                 className="absolute top-1 right-1 w-5 h-5 bg-gray-800/70 rounded-full text-white text-xs flex items-center justify-center"
               >
                 ×
@@ -99,7 +120,7 @@ export default function PhotoUpload({ navigate, onBack }: Props) {
                 key={s}
                 onClick={() => toggleSymptom(s)}
                 className={`px-3 py-2 rounded-xl text-sm font-500 border transition-all active:scale-95 ${
-                  selected.includes(s)
+                  form.tags.includes(s)
                     ? 'bg-red-500 text-white border-red-500'
                     : 'bg-white text-gray-700 border-gray-200 hover:border-red-300'
                 }`}
@@ -110,6 +131,31 @@ export default function PhotoUpload({ navigate, onBack }: Props) {
           </div>
         </div>
 
+        <div className="mt-6">
+          <label htmlFor="problem-description" className="font-display font-700 text-gray-900 text-sm">Describe the problem <span className="text-gray-400 text-xs font-400">(optional)</span></label>
+          <textarea
+            id="problem-description"
+            maxLength={500}
+            value={form.description}
+            onChange={event => {
+              const description = event.target.value;
+              setForm(prev => ({ ...prev, description }));
+              updateSosDraft({ description });
+            }}
+            placeholder="Tell us more about the issue (optional)..."
+            className="mt-3 min-h-28 w-full resize-y rounded-xl border border-gray-200 bg-white p-3 text-sm text-gray-700 outline-none transition focus:border-red-400 focus:ring-2 focus:ring-red-100"
+          />
+          <p className="mt-1 text-right text-xs text-gray-400">{form.description.length}/500</p>
+        </div>
+
+        {form.uploading && <p className="mt-3 text-xs text-gray-500">Preparing your file...</p>}
+        {form.error && (
+          <div className="mt-3 flex items-center justify-between gap-3 text-xs text-red-600">
+            <p className="font-600">{form.error}</p>
+            {form.files[form.files.length - 1] && <button onClick={() => onFile(form.files[form.files.length - 1])} className="shrink-0 font-700 underline">Retry</button>}
+          </div>
+        )}
+
         <p className="text-xs text-gray-400 mt-5">
           ✓ Photo and description are optional but help the technician come prepared
         </p>
@@ -119,7 +165,8 @@ export default function PhotoUpload({ navigate, onBack }: Props) {
         <div className="max-w-md mx-auto">
           <button
             onClick={() => navigate('sos-questionnaire')}
-            className="w-full py-4 rounded-xl font-display font-700 text-base bg-red-500 text-white hover:bg-red-600 shadow-md shadow-red-200 active:scale-[0.98] transition-all"
+            disabled={form.uploading}
+            className="w-full py-4 rounded-xl font-display font-700 text-base bg-red-500 text-white hover:bg-red-600 shadow-md shadow-red-200 active:scale-[0.98] transition-all disabled:cursor-not-allowed disabled:opacity-60"
           >
             Continue →
           </button>

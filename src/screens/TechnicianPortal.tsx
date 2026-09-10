@@ -22,7 +22,7 @@ export default function TechnicianPortal() {
     : <TechDashboard onOpenAlerts={() => setTab('alerts')} onOpenActive={() => setTab('active')} />;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className="technician-portal min-h-screen bg-slate-950 text-slate-100">
       <header className="border-b border-slate-800 bg-slate-900/95 px-5 py-4">
         <div className="mx-auto flex max-w-6xl items-center justify-between">
           <div className="flex items-center gap-3">

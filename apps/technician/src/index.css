@@ -1,1 +1,91 @@
 @import '../../../src/index.css';
+
+.technician-portal {
+	--tech-page: #f9fafb;
+	--tech-card: #ffffff;
+	--tech-border: #f3f4f6;
+	--tech-text: #111827;
+	--tech-muted: #6b7280;
+	--tech-subtle: #9ca3af;
+	background: var(--tech-page);
+	color: var(--tech-text);
+}
+
+.technician-portal .border-slate-800,
+.technician-portal .border-slate-700 {
+	border-color: var(--tech-border);
+}
+
+.technician-portal .bg-slate-900,
+.technician-portal .bg-slate-950 {
+	background-color: var(--tech-card);
+}
+
+.technician-portal .bg-slate-800 {
+	background-color: #f3f4f6;
+}
+
+.technician-portal .text-slate-100,
+.technician-portal .text-slate-200,
+.technician-portal .text-slate-300 {
+	color: var(--tech-text);
+}
+
+.technician-portal .text-slate-400 {
+	color: var(--tech-muted);
+}
+
+.technician-portal .text-slate-500 {
+	color: var(--tech-subtle);
+}
+
+.technician-portal header {
+	background-color: rgb(255 255 255 / 0.95);
+	border-color: var(--tech-border);
+}
+
+.technician-portal .hover\:bg-slate-800:hover {
+	background-color: #f9fafb;
+}
+
+.technician-portal .hover\:bg-slate-900:hover {
+	background-color: #f9fafb;
+}
+
+.technician-portal button.bg-emerald-500 {
+	background-color: #dc2626;
+}
+
+.technician-portal button.bg-emerald-500:hover {
+	background-color: #b91c1c;
+}
+
+.technician-portal button.disabled\:bg-slate-700:disabled {
+	background-color: #e5e7eb;
+}
+
+.technician-portal .bg-red-500\/10 {
+	background-color: #fef2f2;
+}
+
+.technician-portal .border-red-400\/40 {
+	border-color: #fecaca;
+}
+
+.technician-portal .text-red-300,
+.technician-portal .text-red-400 {
+	color: #dc2626;
+}
+
+.technician-portal .text-emerald-300,
+.technician-portal .text-emerald-400 {
+	color: #059669;
+}
+
+.technician-portal .border-emerald-400\/30 {
+	border-color: #a7f3d0;
+}
+
+.technician-portal .bg-emerald-500\/10 {
+	background-color: #ecfdf5;
+}

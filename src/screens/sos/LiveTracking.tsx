@@ -1,73 +1,128 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type L from 'leaflet';
-import type { Screen } from '../../data/mockData';
-import { technicians } from '../../data/mockData';
-import LeafletLocationMap from '../../components/LeafletLocationMap';
-import { useDispatch } from '../../context/DispatchContext';
+import { useCallback, useEffect, useRef, useState } from "react"
+import type L from "leaflet"
+import type { Screen } from "../../data/mockData"
+import { technicians } from "../../data/mockData"
+import LeafletLocationMap from "../../components/LeafletLocationMap"
+import { useDispatch } from "../../context/DispatchContext"
 
 interface Props {
-  navigate: (s: Screen) => void;
+  navigate: (s: Screen) => void
 }
 
 const statuses = [
-  { label: 'Assigned', done: true },
-  { label: 'On the way', done: true, active: true },
-  { label: 'Arriving', done: false },
-  { label: 'Arrived', done: false },
-];
+  { label: "Assigned", done: true },
+  { label: "On the way", done: true, active: true },
+  { label: "Arriving", done: false },
+  { label: "Arrived", done: false },
+]
 
 export default function LiveTracking({ navigate }: Props) {
-  const { job, setStatus } = useDispatch();
-  const tech = technicians.find(item => item.id === job?.technicianId) ?? technicians[0];
-  const [eta, setEta] = useState(8);
-  const [progress, setProgress] = useState(0.15);
-  const mapRef = useRef<L.Map | null>(null);
-  const onMapReady = useCallback((map: L.Map) => { mapRef.current = map; }, []);
+  const { job, setStatus } = useDispatch()
+  const tech = job?.technicianId
+    ? technicians.find((item) => item.id === job.technicianId)
+    : undefined
+  const [eta, setEta] = useState(8)
+  const [progress, setProgress] = useState(0.15)
+  const mapRef = useRef<L.Map | null>(null)
+  const onMapReady = useCallback((map: L.Map) => {
+    mapRef.current = map
+  }, [])
 
   useEffect(() => {
-    if (job?.status === 'accepted') setStatus('en-route');
+    if (job?.status === "accepted") setStatus("en-route")
     const interval = setInterval(() => {
-      setEta(e => Math.max(e - 1, 0));
-      setProgress(p => Math.min(p + 0.015, 0.85));
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
+      setEta((e) => Math.max(e - 1, 0))
+      setProgress((p) => Math.min(p + 0.015, 0.85))
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [])
 
   useEffect(() => {
-    const nextScreen = job?.status === 'arrived' ? 'sos-arrived' : job?.status === 'in-progress' ? 'sos-inprogress' : job?.status === 'completed' ? 'sos-rating' : null;
-    if (!nextScreen && eta !== 0) return;
-    const timer = window.setTimeout(() => navigate(nextScreen ?? 'sos-arrived'), 700);
-    return () => window.clearTimeout(timer);
-  }, [eta, job?.status, navigate]);
+    const nextScreen =
+      job?.status === "arrived"
+        ? "sos-arrived"
+        : job?.status === "in-progress"
+          ? "sos-inprogress"
+          : job?.status === "completed"
+            ? "sos-rating"
+            : null
+    if (!nextScreen && eta !== 0) return
+    const timer = window.setTimeout(
+      () => navigate(nextScreen ?? "sos-arrived"),
+      700,
+    )
+    return () => window.clearTimeout(timer)
+  }, [eta, job?.status, navigate])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => mapRef.current?.invalidateSize(), 200);
-    return () => window.clearTimeout(timer);
-  }, []);
+    const timer = window.setTimeout(() => mapRef.current?.invalidateSize(), 200)
+    return () => window.clearTimeout(timer)
+  }, [])
 
-  const liveStatus = job?.status === 'arrived' ? 'Technician has arrived' : job?.status === 'in-progress' ? 'Service in progress' : 'Rahul is on the way';
+  if (!job?.technicianId || !tech) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6 text-center">
+        <p className="text-sm text-gray-500">
+          Finding your assigned technician...
+        </p>
+      </div>
+    )
+  }
+
+  const liveStatus =
+    job?.status === "arrived"
+      ? "Technician has arrived"
+      : job?.status === "in-progress"
+        ? "Service in progress"
+        : `${tech.name} is on the way`
 
   return (
     <div className="relative flex h-[calc(100vh-64px)] min-h-0 flex-col overflow-hidden bg-gray-50">
       <div className="relative min-h-0 flex-1">
         <div className="absolute inset-0">
-          <LeafletLocationMap initialAddress={job?.location} heightClass="h-full min-h-0" className="h-full rounded-none border-0" showRoute onMapReady={onMapReady} />
+          <LeafletLocationMap
+            initialAddress={job?.location}
+            heightClass="h-full min-h-0"
+            className="h-full rounded-none border-0"
+            showRoute
+            onMapReady={onMapReady}
+          />
         </div>
 
         {/* Top bar */}
         <div className="absolute top-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-b border-gray-100 px-4 py-3 z-10">
           <div className="max-w-md mx-auto flex items-center gap-3">
-            <button onClick={() => navigate('sos-assigned')} className="p-2 -ml-2 rounded-xl hover:bg-gray-100 transition-colors">
-              <svg className="w-5 h-5 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            <button
+              onClick={() => navigate("sos-assigned")}
+              className="p-2 -ml-2 rounded-xl hover:bg-gray-100 transition-colors"
+            >
+              <svg
+                className="w-5 h-5 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
               </svg>
             </button>
             <div className="flex-1">
-              <p className="font-display font-700 text-gray-900 text-sm">{liveStatus}</p>
-              <p className="text-xs text-gray-500">{job?.service || 'Electrical'} emergency · {job?.location || 'Service location'}</p>
+              <p className="font-display font-700 text-gray-900 text-sm">
+                {liveStatus}
+              </p>
+              <p className="text-xs text-gray-500">
+                {job?.service || "Electrical"} emergency ·{" "}
+                {job?.location || "Service location"}
+              </p>
             </div>
             <div className="text-right">
-              <div className="font-display font-800 text-xl text-blue-600">{eta} min</div>
+              <div className="font-display font-800 text-xl text-blue-600">
+                {eta} min
+              </div>
               <p className="text-xs text-gray-400">ETA</p>
             </div>
           </div>
@@ -76,81 +131,137 @@ export default function LiveTracking({ navigate }: Props) {
           <div className="max-w-md mx-auto mt-3">
             <div className="flex items-center">
               {statuses.map((s, i) => (
-                <div key={i} className="flex items-center flex-1 last:flex-none">
+                <div
+                  key={i}
+                  className="flex items-center flex-1 last:flex-none"
+                >
                   <div className="flex flex-col items-center">
-                    <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${
-                      s.done ? (s.active ? 'bg-blue-500 text-white' : 'bg-emerald-500 text-white') : 'bg-gray-100 text-gray-400'
-                    }`}>
-                      {s.done && !s.active ? '✓' : s.active ? '●' : '○'}
+                    <div
+                      className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${
+                        s.done
+                          ? s.active
+                            ? "bg-blue-500 text-white"
+                            : "bg-emerald-500 text-white"
+                          : "bg-gray-100 text-gray-400"
+                      }`}
+                    >
+                      {s.done && !s.active ? "✓" : s.active ? "●" : "○"}
                     </div>
-                    <span className={`text-[10px] mt-0.5 ${s.active ? 'text-blue-600 font-600' : s.done ? 'text-emerald-600' : 'text-gray-400'}`}>
+                    <span
+                      className={`text-[10px] mt-0.5 ${
+                        s.active
+                          ? "text-blue-600 font-600"
+                          : s.done
+                            ? "text-emerald-600"
+                            : "text-gray-400"
+                      }`}
+                    >
                       {s.label}
                     </span>
                   </div>
                   {i < statuses.length - 1 && (
-                    <div className={`flex-1 h-0.5 mx-1 -mt-3 ${s.done ? 'bg-emerald-400' : 'bg-gray-200'}`} />
+                    <div
+                      className={`flex-1 h-0.5 mx-1 -mt-3 ${
+                        s.done ? "bg-emerald-400" : "bg-gray-200"
+                      }`}
+                    />
                   )}
                 </div>
               ))}
             </div>
           </div>
         </div>
-
       </div>
 
       <div className="relative z-[1000] max-h-[48vh] overflow-y-auto rounded-t-2xl bg-white px-5 pt-4 pb-5 shadow-xl">
-            <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
-            <div className="max-w-md mx-auto">
-              <div className="flex items-center gap-3 mb-4">
-                <img src={tech.photo} alt={tech.name} className="w-12 h-12 rounded-full object-cover ring-2 ring-emerald-500/20" />
-                <div className="flex-1">
-                  <p className="font-display font-700 text-gray-900">{tech.name}</p>
-                  <div className="flex items-center gap-1 text-xs text-gray-500">
-                    <span className="text-amber-400">★</span>
-                    <span>{tech.rating}</span>
-                    <span>·</span>
-                    <span>Electrician</span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-display font-800 text-2xl text-blue-600">{eta} min</div>
-                  <p className="text-xs text-gray-400">{tech.distance}</p>
-                </div>
-              </div>
-
-              {/* ETA bar */}
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-5">
-                <div
-                  className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-2000"
-                  style={{ width: `${(1 - eta / 8) * 100}%` }}
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  onClick={() => navigate('sos-chat')}
-                  className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors"
-                >
-                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                  <span className="text-xs text-blue-700 font-500">Chat</span>
-                </button>
-                <button className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 transition-colors">
-                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                  </svg>
-                  <span className="text-xs text-emerald-700 font-500">Call</span>
-                </button>
-                <button className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                  </svg>
-                  <span className="text-xs text-gray-600 font-500">Share</span>
-                </button>
+        <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-4" />
+        <div className="max-w-md mx-auto">
+          <div className="flex items-center gap-3 mb-4">
+            <img
+              src={tech.photo}
+              alt={tech.name}
+              className="w-12 h-12 rounded-full object-cover ring-2 ring-emerald-500/20"
+            />
+            <div className="flex-1">
+              <p className="font-display font-700 text-gray-900">{tech.name}</p>
+              <div className="flex items-center gap-1 text-xs text-gray-500">
+                <span className="text-amber-400">★</span>
+                <span>{tech.rating}</span>
+                <span>·</span>
+                <span>Electrician</span>
               </div>
             </div>
+            <div className="text-right">
+              <div className="font-display font-800 text-2xl text-blue-600">
+                {eta} min
+              </div>
+              <p className="text-xs text-gray-400">{tech.distance}</p>
+            </div>
+          </div>
+
+          {/* ETA bar */}
+          <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-5">
+            <div
+              className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-2000"
+              style={{ width: `${(1 - eta / 8) * 100}%` }}
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={() => navigate("sos-chat")}
+              className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors"
+            >
+              <svg
+                className="w-5 h-5 text-blue-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                />
+              </svg>
+              <span className="text-xs text-blue-700 font-500">Chat</span>
+            </button>
+            <button className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 transition-colors">
+              <svg
+                className="w-5 h-5 text-emerald-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                />
+              </svg>
+              <span className="text-xs text-emerald-700 font-500">Call</span>
+            </button>
+            <button className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
+              <svg
+                className="w-5 h-5 text-gray-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                />
+              </svg>
+              <span className="text-xs text-gray-600 font-500">Share</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
-  );
+  )
 }

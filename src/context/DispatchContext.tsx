@@ -1,78 +1,135 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { ConfirmedLocation, DispatchAttachment, DispatchEvent, DispatchJob, DispatchStatus, ExecutionStep, JobStatus, TechnicianProfile } from '../types/dispatch';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react"
+import type {
+  ConfirmedLocation,
+  DispatchAttachment,
+  DispatchEvent,
+  DispatchJob,
+  DispatchStatus,
+  ExecutionStep,
+  JobStatus,
+  TechnicianProfile,
+} from "../types/dispatch"
+import { forwardGeocode } from "../utils/geocoding"
 
-const CHANNEL_NAME = 'sos-dispatch';
-const STORAGE_KEY = 'sos-dispatch-job';
-const EVENT_KEY = 'sos-dispatch-event';
-const DISPATCH_BRIDGE_URL = 'http://localhost:3000/__sos_dispatch';
+const CHANNEL_NAME = "sos-dispatch"
+const STORAGE_KEY = "sos-dispatch-job"
+const EVENT_KEY = "sos-dispatch-event"
+const DISPATCH_BRIDGE_URL = "http://localhost:3000/__sos_dispatch"
 
 function canUseDispatchBridge() {
-  return typeof window !== 'undefined' && window.location.hostname === 'localhost';
+  return (
+    typeof window !== "undefined" && window.location.hostname === "localhost"
+  )
 }
 
 async function publishToDispatchBridge(event: DispatchEvent) {
-  if (!canUseDispatchBridge()) return;
+  if (!canUseDispatchBridge()) return
   try {
     await fetch(DISPATCH_BRIDGE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(event),
-    });
-    console.log('[dispatch] bridge published', event.type, event.job?.id ?? event.requestId);
+    })
+    console.log(
+      "[dispatch] bridge published",
+      event.type,
+      event.job?.id ?? event.requestId,
+    )
   } catch (error) {
-    console.warn('[dispatch] bridge publish failed', error);
+    console.warn("[dispatch] bridge publish failed", error)
   }
 }
 
-function applyDispatchEvent(current: DispatchJob | null, incoming: DispatchEvent) {
-  if (incoming.job) return incoming.job;
-  if (incoming.type === 'NEW_REQUEST' && incoming.request) return incoming.request;
-  if ((incoming.type === 'ACCEPTED' || incoming.type === 'STATUS') && incoming.requestId && current?.id === incoming.requestId) {
-    return { ...current, status: normalizeStatus(incoming.status), updatedAt: Date.now(), ...(incoming.job ?? {}) };
+function applyDispatchEvent(
+  current: DispatchJob | null,
+  incoming: DispatchEvent,
+) {
+  if (incoming.job) return incoming.job
+  if (incoming.type === "NEW_REQUEST" && incoming.request)
+    return incoming.request
+  if (
+    (incoming.type === "ACCEPTED" || incoming.type === "STATUS") &&
+    incoming.requestId &&
+    current?.id === incoming.requestId
+  ) {
+    return {
+      ...current,
+      status: normalizeStatus(incoming.status),
+      updatedAt: Date.now(),
+      ...(incoming.job ?? {}),
+    }
   }
-  return current;
+  return current
 }
 
 interface DispatchContextValue {
-  job: DispatchJob | null;
-  activeRequest: DispatchJob | null;
-  assignedTechnician: TechnicianProfile | null;
-  pendingRequest: DispatchJob | null;
-  jobHistory: DispatchJob[];
-  technicianOnline: boolean;
-  confirmedLocation: ConfirmedLocation;
-  setConfirmedLocation: (location: ConfirmedLocation) => void;
-  createJob: (input: Pick<DispatchJob, 'service' | 'priority'> & Partial<Pick<DispatchJob, 'symptoms' | 'location' | 'attachments'>>) => DispatchJob;
-  submitSOSRequest: (input: Pick<DispatchJob, 'service' | 'priority'> & Partial<Pick<DispatchJob, 'symptoms' | 'location' | 'attachments'>>) => DispatchJob;
-  updateJob: (patch: Partial<DispatchJob>) => void;
-  setStatus: (status: DispatchStatus) => void;
-  setExecutionStep: (step: ExecutionStep) => void;
-  acceptJob: () => void;
-  declineJob: () => void;
-  acceptRequest: () => void;
-  declineRequest: () => void;
-  updateJobStatus: (status: JobStatus) => void;
-  completeJob: () => void;
-  setTechOnline: (online: boolean) => void;
-  addAttachments: (attachments: DispatchAttachment[]) => void;
+  job: DispatchJob | null
+  activeRequest: DispatchJob | null
+  assignedTechnician: TechnicianProfile | null
+  pendingRequest: DispatchJob | null
+  jobHistory: DispatchJob[]
+  technicianOnline: boolean
+  confirmedLocation: ConfirmedLocation
+  setConfirmedLocation: (location: ConfirmedLocation) => void
+  createJob: (
+    input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "customerName" | "customerPhone" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude">>,
+  ) => DispatchJob
+  submitSOSRequest: (
+    input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude">> & {
+      locationOverride?: { address: string area: string }
+      requestedFor?: {
+        memberId: string
+        name: string
+        relation: string
+        phone: string
+        address: string
+        area: string
+        requesterUserId?: string
+        requesterName?: string
+        requesterPhone?: string
+      }
+    },
+  ) => DispatchJob
+  updateJob: (patch: Partial<DispatchJob>) => void
+  setStatus: (status: DispatchStatus) => void
+  setExecutionStep: (step: ExecutionStep) => void
+  acceptJob: () => void
+  declineJob: () => void
+  acceptRequest: () => void
+  declineRequest: () => void
+  updateJobStatus: (status: JobStatus) => void
+  completeJob: () => void
+  setTechOnline: (online: boolean) => void
+  addAttachments: (attachments: DispatchAttachment[]) => void
+  updateSosDraft: (
+    patch: Partial<Pick<DispatchJob, "symptoms" | "description" | "attachments">>,
+  ) => void
 }
 
-const DispatchContext = createContext<DispatchContextValue | null>(null);
+const DispatchContext = createContext<DispatchContextValue | null>(null)
 
 function readStoredJob(): DispatchJob | null {
   try {
-    const value = window.localStorage.getItem(STORAGE_KEY);
-    if (!value) return null;
-    const parsed = JSON.parse(value) as DispatchJob;
-    return parsed && typeof parsed === 'object' ? parsed : null;
+    const value = window.localStorage.getItem(STORAGE_KEY)
+    if (!value) return null
+    const parsed = JSON.parse(value) as DispatchJob
+    return parsed && typeof parsed === "object" ? parsed : null
   } catch {
-    return null;
+    return null
   }
 }
 
 function writeStorage(key: string, value: unknown) {
   try {
-    window.localStorage.setItem(key, JSON.stringify(value));
+    window.localStorage.setItem(key, JSON.stringify(value))
   } catch {
     // Storage can be blocked or full; in-memory state remains usable.
   }
@@ -80,14 +137,14 @@ function writeStorage(key: string, value: unknown) {
 
 function publish(event: DispatchEvent) {
   try {
-    const channel = new BroadcastChannel(CHANNEL_NAME);
-    channel.postMessage(event);
-    channel.close();
+    const channel = new BroadcastChannel(CHANNEL_NAME)
+    channel.postMessage(event)
+    channel.close()
   } catch {
     // BroadcastChannel is unavailable in older browsers; storage event handles other tabs.
   }
   try {
-    writeStorage(EVENT_KEY, { ...event, sentAt: Date.now() });
+    writeStorage(EVENT_KEY, { ...event, sentAt: Date.now() })
   } catch {
     // Storage may be unavailable in private browsing.
   }
@@ -95,198 +152,379 @@ function publish(event: DispatchEvent) {
 
 export function resizeFileToBase64(file: File, maxSize = 640): Promise<string> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error);
+    const reader = new FileReader()
+    reader.onerror = () => reject(reader.error)
     reader.onload = () => {
-      if (!file.type.startsWith('image/')) {
-        resolve(String(reader.result));
-        return;
+      if (!file.type.startsWith("image/")) {
+        resolve(String(reader.result))
+        return
       }
-      const image = new Image();
-      image.onerror = () => reject(new Error('Unable to read image'));
+      const image = new Image()
+      image.onerror = () => reject(new Error("Unable to read image"))
       image.onload = () => {
-        const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, Math.round(image.width * scale));
-        canvas.height = Math.max(1, Math.round(image.height * scale));
-        canvas.getContext('2d')?.drawImage(image, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.78));
-      };
-      image.src = String(reader.result);
-    };
-    reader.readAsDataURL(file);
-  });
+        const scale = Math.min(1, maxSize / Math.max(image.width, image.height))
+        const canvas = document.createElement("canvas")
+        canvas.width = Math.max(1, Math.round(image.width * scale))
+        canvas.height = Math.max(1, Math.round(image.height * scale))
+        canvas
+          .getContext("2d")
+          ?.drawImage(image, 0, 0, canvas.width, canvas.height)
+        resolve(canvas.toDataURL("image/jpeg", 0.78))
+      }
+      image.src = String(reader.result)
+    }
+    reader.readAsDataURL(file)
+  })
 }
 
 export function DispatchProvider({ children }: { children: ReactNode }) {
-  const [job, setJob] = useState<DispatchJob | null>(() => readStoredJob());
-  const [technicianOnline, setTechnicianOnline] = useState(true);
-  const [confirmedLocation, setConfirmedLocation] = useState<ConfirmedLocation>({
-    id: 'a1',
-    label: 'Home',
-    fullAddress: 'B-204, Gaur City 2, Greater Noida West',
-    area: 'Greater Noida, UP 201318',
-  });
+  const [job, setJob] = useState<DispatchJob | null>(() => readStoredJob())
+  const [sosDraft, setSosDraft] =
+    useState<Pick<DispatchJob, "symptoms" | "description" | "attachments">>({
+      symptoms: [],
+      description: "",
+      attachments: [],
+    })
+  const [technicianOnline, setTechnicianOnline] = useState(true)
+  const [confirmedLocation, setConfirmedLocation] = useState<ConfirmedLocation>(
+    {
+      id: "a1",
+      label: "Home",
+      fullAddress: "B-204, Gaur City 2, Greater Noida West",
+      area: "Greater Noida, UP 201318",
+    },
+  )
+  const updateSosDraft = useCallback(
+    (
+      patch: Partial<Pick<DispatchJob, "symptoms" | "description" | "attachments">>,
+    ) => {
+      setSosDraft((current) => ({ ...current, ...patch }))
+    },
+    [],
+  )
 
   useEffect(() => {
-    let channel: BroadcastChannel | null = null;
+    let channel: BroadcastChannel | null = null
     try {
-      channel = new BroadcastChannel(CHANNEL_NAME);
+      channel = new BroadcastChannel(CHANNEL_NAME)
       channel.onmessage = (message: MessageEvent<DispatchEvent>) => {
-        const incoming = message.data;
-        console.log('[dispatch] BroadcastChannel received', incoming?.type, incoming?.job?.id ?? incoming?.requestId);
+        const incoming = message.data
+        console.log(
+          "[dispatch] BroadcastChannel received",
+          incoming?.type,
+          incoming?.job?.id ?? incoming?.requestId,
+        )
         if (incoming?.job) {
-          setJob(incoming.job);
-          return;
+          setJob(incoming.job)
+          return
         }
-        if (incoming?.type === 'NEW_REQUEST' && incoming.request) {
-          setJob(incoming.request);
-          return;
+        if (incoming?.type === "NEW_REQUEST" && incoming.request) {
+          setJob(incoming.request)
+          return
         }
-        if ((incoming?.type === 'ACCEPTED' || incoming?.type === 'STATUS') && incoming.requestId) {
-          setJob(current => current?.id === incoming.requestId ? { ...current, status: normalizeStatus(incoming.status), updatedAt: Date.now(), ...(incoming.job ?? {}) } : current);
+        if (
+          (incoming?.type === "ACCEPTED" || incoming?.type === "STATUS") &&
+          incoming.requestId
+        ) {
+          setJob((current) =>
+            current?.id === incoming.requestId
+              ? {
+                  ...current,
+                  status: normalizeStatus(incoming.status),
+                  updatedAt: Date.now(),
+                  ...(incoming.job ?? {}),
+                }
+              : current,
+          )
         }
-      };
+      }
     } catch {
-      channel = null;
+      channel = null
     }
     const onStorage = (event: StorageEvent) => {
       if (event.key === STORAGE_KEY && event.newValue) {
         try {
-          const parsed = JSON.parse(event.newValue) as DispatchJob;
-          if (parsed && typeof parsed === 'object') setJob(parsed);
-        } catch { /* Ignore malformed external storage. */ }
+          const parsed = JSON.parse(event.newValue) as DispatchJob
+          if (parsed && typeof parsed === "object") setJob(parsed)
+        } catch {
+          /* Ignore malformed external storage. */
+        }
       }
       if (event.key === EVENT_KEY && event.newValue) {
         try {
-          const payload = JSON.parse(event.newValue) as DispatchEvent;
-          if (payload.job) setJob(payload.job);
-          else if (payload.type === 'NEW_REQUEST') setJob(payload.request);
-          else if ((payload.type === 'ACCEPTED' || payload.type === 'STATUS') && payload.requestId) {
-            setJob(current => current?.id === payload.requestId ? { ...current, status: normalizeStatus(payload.status), updatedAt: Date.now(), ...(payload.job ?? {}) } : current);
+          const payload = JSON.parse(event.newValue) as DispatchEvent
+          if (payload.job) setJob(payload.job)
+          else if (payload.type === "NEW_REQUEST") setJob(payload.request)
+          else if (
+            (payload.type === "ACCEPTED" || payload.type === "STATUS") &&
+            payload.requestId
+          ) {
+            setJob((current) =>
+              current?.id === payload.requestId
+                ? {
+                    ...current,
+                    status: normalizeStatus(payload.status),
+                    updatedAt: Date.now(),
+                    ...(payload.job ?? {}),
+                  }
+                : current,
+            )
           }
-        } catch { /* Ignore malformed external events. */ }
+        } catch {
+          /* Ignore malformed external events. */
+        }
       }
-    };
-    window.addEventListener('storage', onStorage);
-    let disposed = false;
+    }
+    window.addEventListener("storage", onStorage)
+    let disposed = false
     const pollBridge = async () => {
-      if (!canUseDispatchBridge()) return;
+      if (!canUseDispatchBridge()) return
       try {
-        const response = await fetch(DISPATCH_BRIDGE_URL, { cache: 'no-store' });
-        if (!response.ok || response.status === 204) return;
-        const incoming = await response.json() as DispatchEvent;
-        console.log('[dispatch] bridge received', incoming?.type, incoming?.job?.id ?? incoming?.requestId);
-        if (!disposed) setJob(current => applyDispatchEvent(current, incoming));
+        const response = await fetch(DISPATCH_BRIDGE_URL, { cache: "no-store" })
+        if (!response.ok || response.status === 204) return
+        const incoming = (await response.json()) as DispatchEvent
+        console.log(
+          "[dispatch] bridge received",
+          incoming?.type,
+          incoming?.job?.id ?? incoming?.requestId,
+        )
+        if (!disposed)
+          setJob((current) => applyDispatchEvent(current, incoming))
       } catch (error) {
-        console.warn('[dispatch] bridge poll failed', error);
+        console.warn("[dispatch] bridge poll failed", error)
       }
-    };
-    void pollBridge();
-    const bridgeTimer = window.setInterval(pollBridge, 1000);
+    }
+    void pollBridge()
+    const bridgeTimer = window.setInterval(pollBridge, 1000)
     return () => {
-      disposed = true;
-      channel?.close();
-      window.clearInterval(bridgeTimer);
-      window.removeEventListener('storage', onStorage);
-    };
-  }, []);
+      disposed = true
+      channel?.close()
+      window.clearInterval(bridgeTimer)
+      window.removeEventListener("storage", onStorage)
+    }
+  }, [])
 
   const updateJob = useCallback((patch: Partial<DispatchJob>) => {
-    setJob(current => {
-      if (!current) return current;
-      const next = { ...current, ...patch, updatedAt: Date.now() };
-      writeStorage(STORAGE_KEY, next);
-      publish({ type: 'job-updated', job: next });
-      void publishToDispatchBridge({ type: 'job-updated', job: next });
-      console.log('[dispatch] job updated', { id: next.id, status: next.status, patch });
-      return next;
-    });
-  }, []);
+    setJob((current) => {
+      if (!current) return current
+      const next = { ...current, ...patch, updatedAt: Date.now() }
+      writeStorage(STORAGE_KEY, next)
+      publish({ type: "job-updated", job: next })
+      void publishToDispatchBridge({ type: "job-updated", job: next })
+      console.log("[dispatch] job updated", {
+        id: next.id,
+        status: next.status,
+        patch,
+      })
+      return next
+    })
+  }, [])
 
-  const createJob = useCallback((input: Pick<DispatchJob, 'service' | 'priority'> & Partial<Pick<DispatchJob, 'symptoms' | 'location' | 'attachments'>>) => {
-    const next: DispatchJob = {
-      id: `job-${Date.now()}`,
-      service: input.service,
-      priority: input.priority,
-      symptoms: input.symptoms ?? [],
-      location: input.location ?? 'B-204, Gaur City 2, Greater Noida West',
-      customerName: 'Azaan Sheikh',
-      customerPhone: '+91 98765 00000',
-      estimatedTotal: 648,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      status: 'requested',
-      executionStep: 'accepted',
-      attachments: input.attachments ?? [],
-    };
-    setJob(next);
-    writeStorage(STORAGE_KEY, next);
-    publish({ type: 'job-created', job: next });
-    void publishToDispatchBridge({ type: 'job-created', job: next });
-    console.log('[dispatch] job created', { id: next.id, service: next.service, priority: next.priority, status: next.status });
-    return next;
-  }, []);
+  const createJob = useCallback(
+    (
+      input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "customerName" | "customerPhone" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude">>,
+    ) => {
+      const next: DispatchJob = {
+        id: `job-${Date.now()}`,
+        service: input.service,
+        priority: input.priority ?? "medium",
+        symptoms: input.symptoms ?? sosDraft.symptoms,
+        ...(input.description !== undefined || sosDraft.description
+          ? { description: input.description ?? sosDraft.description }
+          : {}),
+        location: input.location ?? "B-204, Gaur City 2, Greater Noida West",
+        customerName: input.customerName ?? "Azaan Sheikh",
+        customerPhone: input.customerPhone ?? "+91 98765 00000",
+        requesterUserId: input.requesterUserId,
+        requesterName: input.requesterName,
+        requesterPhone: input.requesterPhone,
+        requestedForMemberId: input.requestedForMemberId,
+        requestedForRelation: input.requestedForRelation,
+        serviceLatitude: input.serviceLatitude,
+        serviceLongitude: input.serviceLongitude,
+        estimatedTotal: 648,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        status: "requested",
+        executionStep: "accepted",
+        attachments: input.attachments ?? sosDraft.attachments,
+      }
+      setJob(next)
+      writeStorage(STORAGE_KEY, next)
+      publish({ type: "job-created", job: next })
+      void publishToDispatchBridge({ type: "job-created", job: next })
+      console.log("[dispatch] job created", {
+        id: next.id,
+        service: next.service,
+        priority: next.priority,
+        status: next.status,
+      })
+      return next
+    },
+    [sosDraft],
+  )
 
-  const submitSOSRequest = useCallback((input: Pick<DispatchJob, 'service' | 'priority'> & Partial<Pick<DispatchJob, 'symptoms' | 'location' | 'attachments'>>) => {
-    return createJob({ ...input, location: confirmedLocation.fullAddress });
-  }, [confirmedLocation.fullAddress, createJob]);
+  const submitSOSRequest = useCallback(
+    (
+      input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude">> & {
+        locationOverride?: { address: string area: string }
+        requestedFor?: {
+          memberId: string
+          name: string
+          relation: string
+          phone: string
+          address: string
+          area: string
+          requesterUserId?: string
+          requesterName?: string
+          requesterPhone?: string
+        }
+      },
+    ) => {
+      const requestedFor = input.requestedFor
+      const location = requestedFor
+        ? `${requestedFor.address}, ${requestedFor.area}`
+        : input.locationOverride
+          ? `${input.locationOverride.address}, ${input.locationOverride.area}`
+          : confirmedLocation.fullAddress
+      const createdJob = createJob({
+        ...input,
+        location,
+        serviceLatitude: input.serviceLatitude ?? (requestedFor ? undefined : confirmedLocation.latitude),
+        serviceLongitude: input.serviceLongitude ?? (requestedFor ? undefined : confirmedLocation.longitude),
+        ...(requestedFor
+          ? {
+              customerName: requestedFor.name,
+              customerPhone: requestedFor.phone,
+              requestedForMemberId: requestedFor.memberId,
+              requestedForRelation: requestedFor.relation,
+              requesterUserId: requestedFor.requesterUserId,
+              requesterName: requestedFor.requesterName,
+              requesterPhone: requestedFor.requesterPhone,
+            }
+          : {}),
+      })
+      if (createdJob.serviceLatitude === undefined || createdJob.serviceLongitude === undefined) {
+        void forwardGeocode(createdJob.location).then((coordinates) => {
+          if (!coordinates) return
+          updateJob({ serviceLatitude: coordinates.latitude, serviceLongitude: coordinates.longitude })
+        })
+      }
+      return createdJob
+    },
+    [confirmedLocation.fullAddress, confirmedLocation.latitude, confirmedLocation.longitude, createJob, updateJob],
+  )
 
-  const value = useMemo<DispatchContextValue>(() => ({
-    job,
-    activeRequest: job,
-    pendingRequest: job?.status === 'requested' || job?.status === 'searching' ? job : null,
-    assignedTechnician: job?.technicianId ? {
-      id: job.technicianId,
-      name: job.technicianName ?? 'Rahul Kumar',
-      rating: 4.9,
-      vehicle: 'Honda Activa · DL 5S 4521',
-      eta: '8 min',
-      distance: '1.8 km',
-      specializations: ['Electrical', 'Emergency repair'],
-    } : null,
-    jobHistory: job?.status === 'completed' || job?.status === 'declined' || job?.status === 'cancelled' ? [job] : [],
-    technicianOnline,
-    confirmedLocation,
-    setConfirmedLocation,
-    createJob,
-    submitSOSRequest,
-    updateJob,
-    setStatus: (status) => updateJob({ status }),
-    setExecutionStep: (executionStep) => updateJob({ executionStep, status: executionStep === 'completed' ? 'completed' : executionStep }),
-    acceptJob: () => updateJob({ status: 'accepted', executionStep: 'accepted', technicianId: 't1', technicianName: 'Rahul Kumar' }),
-    declineJob: () => updateJob({ status: 'declined' }),
-    acceptRequest: () => updateJob({ status: 'accepted', executionStep: 'accepted', technicianId: 't1', technicianName: 'Rahul Kumar' }),
-    declineRequest: () => updateJob({ status: 'declined' }),
-    updateJobStatus: (status) => updateJob({ status: normalizeStatus(status), executionStep: normalizeStatus(status) as ExecutionStep }),
-    completeJob: () => updateJob({ status: 'completed', executionStep: 'completed' }),
-    setTechOnline: setTechnicianOnline,
-    addAttachments: (attachments) => updateJob({ attachments: [...(job?.attachments ?? []), ...attachments] }),
-  }), [createJob, confirmedLocation, job, submitSOSRequest, technicianOnline, updateJob]);
+  const value = useMemo<DispatchContextValue>(
+    () => ({
+      job,
+      activeRequest: job,
+      pendingRequest:
+        job?.status === "requested" || job?.status === "searching" ? job : null,
+      assignedTechnician: job?.technicianId
+        ? {
+            id: job.technicianId,
+            name: job.technicianName ?? "Rahul Kumar",
+            rating: 4.9,
+            vehicle: "Honda Activa · DL 5S 4521",
+            eta: "8 min",
+            distance: "1.8 km",
+            specializations: ["Electrical", "Emergency repair"],
+          }
+        : null,
+      jobHistory:
+        job?.status === "completed" ||
+        job?.status === "declined" ||
+        job?.status === "cancelled"
+          ? [job]
+          : [],
+      technicianOnline,
+      confirmedLocation,
+      setConfirmedLocation,
+      createJob,
+      submitSOSRequest,
+      updateJob,
+      setStatus: (status) => updateJob({ status }),
+      setExecutionStep: (executionStep) =>
+        updateJob({
+          executionStep,
+          status: executionStep === "completed" ? "completed" : executionStep,
+        }),
+      acceptJob: () =>
+        updateJob({
+          status: "accepted",
+          executionStep: "accepted",
+          technicianId: "t1",
+          technicianName: "Rahul Kumar",
+        }),
+      declineJob: () => updateJob({ status: "declined" }),
+      acceptRequest: () =>
+        updateJob({
+          status: "accepted",
+          executionStep: "accepted",
+          technicianId: "t1",
+          technicianName: "Rahul Kumar",
+        }),
+      declineRequest: () => updateJob({ status: "declined" }),
+      updateJobStatus: (status) =>
+        updateJob({
+          status: normalizeStatus(status),
+          executionStep: normalizeStatus(status) as ExecutionStep,
+        }),
+      completeJob: () =>
+        updateJob({ status: "completed", executionStep: "completed" }),
+      setTechOnline: setTechnicianOnline,
+      addAttachments: (attachments) =>
+        job
+          ? updateJob({
+              attachments: [...(job.attachments ?? []), ...attachments],
+            })
+          : setSosDraft((current) => ({
+              ...current,
+              attachments: [...current.attachments, ...attachments],
+            })),
+      updateSosDraft,
+    }),
+    [
+      createJob,
+      confirmedLocation,
+      job,
+      sosDraft,
+      submitSOSRequest,
+      technicianOnline,
+      updateJob,
+      updateSosDraft,
+    ],
+  )
 
-  return <DispatchContext.Provider value={value}>{children}</DispatchContext.Provider>;
+  return (
+    <DispatchContext.Provider value={value}>
+      {children}
+    </DispatchContext.Provider>
+  )
 }
 
 function normalizeStatus(status: JobStatus): DispatchStatus {
   const statusMap: Record<JobStatus, DispatchStatus> = {
-    PENDING_TECHNICIAN_ACCEPTANCE: 'requested',
-    ACCEPTED: 'accepted',
-    ON_THE_WAY: 'en-route',
-    ARRIVED: 'arrived',
-    IN_PROGRESS: 'in-progress',
-    COMPLETED: 'completed',
-    CANCELLED: 'cancelled',
-    DECLINED: 'declined',
-  };
-  return statusMap[status];
+    PENDING_TECHNICIAN_ACCEPTANCE: "requested",
+    ACCEPTED: "accepted",
+    ON_THE_WAY: "en-route",
+    ARRIVED: "arrived",
+    IN_PROGRESS: "in-progress",
+    COMPLETED: "completed",
+    CANCELLED: "cancelled",
+    DECLINED: "declined",
+  }
+  return statusMap[status]
 }
 
 export function useDispatch() {
-  const context = useContext(DispatchContext);
-  if (!context) throw new Error('useDispatch must be used inside DispatchProvider');
-  return context;
+  const context = useContext(DispatchContext)
+  if (!context)
+    throw new Error("useDispatch must be used inside DispatchProvider")
+  return context
 }
 
 export function useOptionalDispatch() {
-  return useContext(DispatchContext);
+  return useContext(DispatchContext)
 }

@@ -65,7 +65,6 @@ const activeScreens: Record<string, string> = {
   bookings: 'bookings',
   family: 'family',
   'family-member': 'family',
-  'family-tracking': 'family',
   profile: 'profile',
 };
 

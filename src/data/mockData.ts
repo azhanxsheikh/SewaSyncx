@@ -20,7 +20,6 @@ export type Screen =
   | 'sos-rating'
   | 'family'
   | 'family-member'
-  | 'family-tracking'
   | 'scheduled-category'
   | 'scheduled-service'
   | 'scheduled-datetime'
