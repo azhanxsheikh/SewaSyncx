@@ -1,5 +1,6 @@
-import type { Screen } from '../../data/mockData';
-import { technicians } from '../../data/mockData';
+import type { Screen } from '../../types/navigation';
+import { usePrimaryTechnician } from '../../hooks/useTechnicians';
+import { invoiceLineItems } from '../../fixtures/billing.fixture';
 import Header from '../../components/Header';
 
 interface Props {
@@ -8,7 +9,7 @@ interface Props {
 }
 
 export default function DigitalInvoice({ navigate, onBack }: Props) {
-  const tech = technicians[0];
+  const tech = usePrimaryTechnician();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -71,12 +72,7 @@ export default function DigitalInvoice({ navigate, onBack }: Props) {
                 <span>Description</span>
                 <span>Amount</span>
               </div>
-              {[
-                { desc: 'Electrical repair service (1 hr 12 min)', amount: 499 },
-                { desc: 'Emergency dispatch fee', amount: 149 },
-                { desc: 'MCB replacement (×2) — parts', amount: 240 },
-                { desc: 'MCB replacement — labour', amount: 110 },
-              ].map((item, i) => (
+              {invoiceLineItems.map((item, i) => (
                 <div key={i} className="flex justify-between py-2 border-b border-gray-50 last:border-0 text-sm">
                   <span className="text-gray-700 pr-4">{item.desc}</span>
                   <span className="font-600 text-gray-900 flex-shrink-0">₹{item.amount}</span>

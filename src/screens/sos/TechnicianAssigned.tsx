@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react"
 import type L from "leaflet"
-import type { Screen } from "../../data/mockData"
-import { technicians } from "../../data/mockData"
+import type { Screen } from "../../types/navigation"
+import { useTechnicianProfile } from "../../hooks/useTechnicians"
 import LeafletLocationMap from "../../components/LeafletLocationMap"
 import TechnicianCard from "../../components/TechnicianCard"
 import { useDispatch } from "../../context/DispatchContext"
@@ -12,9 +12,7 @@ interface Props {
 
 export default function TechnicianAssigned({ navigate }: Props) {
   const { job } = useDispatch()
-  const tech = job?.technicianId
-    ? technicians.find((item) => item.id === job.technicianId)
-    : undefined
+  const tech = useTechnicianProfile(job?.technicianId)
   const mapRef = useRef<L.Map | null>(null)
   const onMapReady = useCallback((map: L.Map) => {
     mapRef.current = map

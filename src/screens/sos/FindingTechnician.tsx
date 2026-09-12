@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import type { Screen } from "../../data/mockData"
+import type { Screen } from "../../types/navigation"
 import MapView from "../../components/MapView"
 import { useDispatch } from "../../context/DispatchContext"
 

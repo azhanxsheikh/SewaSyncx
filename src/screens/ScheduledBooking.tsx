@@ -1,6 +1,13 @@
 import { useState } from 'react';
-import type { Screen } from '../data/mockData';
-import { scheduledCategories } from '../data/mockData';
+import type { Screen } from '../types/navigation';
+import {
+  availableDates as dates,
+  scheduledOfferings,
+  timeSlots,
+} from '../fixtures/services.fixture';
+import { scheduledAddressOptions } from '../fixtures/account.fixture';
+import { useScheduledCategories } from '../hooks/useServiceCatalog';
+import type { ServiceOffering } from '../types/domain';
 import Header from '../components/Header';
 
 interface Props {
@@ -10,46 +17,10 @@ interface Props {
   onBack: () => void;
 }
 
-const services: Record<string, { name: string; price: number; duration: string; desc: string }[]> = {
-  ac: [
-    { name: 'AC Service & Cleaning', price: 499, duration: '1–2 hrs', desc: 'Full service, filter clean, drain check' },
-    { name: 'AC Gas Refill (R22)', price: 999, duration: '2–3 hrs', desc: 'Gas top-up with pressure test' },
-    { name: 'AC Installation', price: 1299, duration: '3–4 hrs', desc: 'New AC installation with testing' },
-  ],
-  electrical: [
-    { name: 'Fan Installation', price: 249, duration: '30–45 min', desc: 'Ceiling or wall fan fitting' },
-    { name: 'Switchboard Repair', price: 349, duration: '1–2 hrs', desc: 'Wiring, switch, and socket repair' },
-    { name: 'Full Home Wiring Check', price: 799, duration: '3–4 hrs', desc: 'Safety audit of all circuits' },
-  ],
-  plumbing: [
-    { name: 'Tap/Faucet Repair', price: 249, duration: '30–60 min', desc: 'Fix or replace leaking taps' },
-    { name: 'Drain Cleaning', price: 399, duration: '1–2 hrs', desc: 'Kitchen and bathroom drain clearing' },
-    { name: 'Water Heater Service', price: 599, duration: '1.5–2 hrs', desc: 'Geyser repair and descaling' },
-  ],
-  cleaning: [
-    { name: 'Home Deep Clean (2BHK)', price: 1199, duration: '4–5 hrs', desc: 'Full home deep clean including bathrooms' },
-    { name: 'Kitchen Deep Clean', price: 699, duration: '2–3 hrs', desc: 'Chimney, hob, and appliance clean' },
-    { name: 'Bathroom Cleaning (2)', price: 499, duration: '2–3 hrs', desc: 'Tiles, commode, and fixtures' },
-  ],
-  default: [
-    { name: 'Standard Service', price: 399, duration: '1–2 hrs', desc: 'General service and maintenance' },
-    { name: 'Premium Service', price: 699, duration: '2–3 hrs', desc: 'Comprehensive service with warranty' },
-  ],
-};
-
-const timeSlots = ['9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM'];
-
-const dates = [
-  { label: 'Tomorrow', date: 'Sep 6, Sat' },
-  { label: 'Sun', date: 'Sep 7' },
-  { label: 'Mon', date: 'Sep 8' },
-  { label: 'Tue', date: 'Sep 9' },
-  { label: 'Wed', date: 'Sep 10' },
-];
-
 export default function ScheduledBooking({ navigate, subScreen, setSubScreen, onBack }: Props) {
+  const scheduledCategories = useScheduledCategories();
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedService, setSelectedService] = useState<{ name: string; price: number; duration: string; desc: string } | null>(null);
+  const [selectedService, setSelectedService] = useState<ServiceOffering | null>(null);
   const [selectedDate, setSelectedDate] = useState(0);
   const [selectedTime, setSelectedTime] = useState('');
   const [confirming, setConfirming] = useState(false);
@@ -188,10 +159,7 @@ export default function ScheduledBooking({ navigate, subScreen, setSubScreen, on
         {stepBar}
         <div className="flex-1 px-4 pt-6 pb-28 max-w-md mx-auto w-full space-y-4">
           <h2 className="font-display font-800 text-xl text-gray-900">Service address</h2>
-          {[
-            { label: 'Home', icon: '🏠', addr: 'B-204, Gaur City 2, Greater Noida West', area: 'Greater Noida, UP 201318' },
-            { label: 'Work', icon: '🏢', addr: '14th Floor, World Trade Centre, Sector 16', area: 'Noida, UP 201301' },
-          ].map((a, i) => (
+          {scheduledAddressOptions.map((a, i) => (
             <button
               key={i}
               onClick={() => setSubScreen('pricing')}
@@ -279,7 +247,7 @@ export default function ScheduledBooking({ navigate, subScreen, setSubScreen, on
 
   if (subScreen === 'service') {
     const catId = selectedCategory || 'ac';
-    const catServices = services[catId] || services.default;
+    const catServices = scheduledOfferings[catId] || scheduledOfferings.default;
     const cat = scheduledCategories.find(c => c.id === catId);
 
     return (

@@ -1,12 +1,13 @@
-import type { Screen } from '../../data/mockData';
-import { technicians } from '../../data/mockData';
+import type { Screen } from '../../types/navigation';
+import { usePrimaryTechnician } from '../../hooks/useTechnicians';
+import { completedWorkItems } from '../../fixtures/requests.fixture';
 
 interface Props {
   navigate: (s: Screen) => void;
 }
 
 export default function JobCompleted({ navigate }: Props) {
-  const tech = technicians[0];
+  const tech = usePrimaryTechnician();
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -78,12 +79,7 @@ export default function JobCompleted({ navigate }: Props) {
         <div className="bg-white rounded-2xl border border-gray-100 p-4">
           <p className="font-display font-700 text-gray-900 text-sm mb-2">Work completed</p>
           <ul className="space-y-1.5 text-xs text-gray-600">
-            {[
-              'Diagnosed main switchboard fault',
-              'Replaced 2× faulty MCB units (16A)',
-              'Tested all power circuits',
-              'Restored full power to home',
-            ].map((item) => (
+            {completedWorkItems.map((item) => (
               <li key={item} className="flex items-start gap-2">
                 <span className="text-emerald-500 mt-0.5">✓</span>
                 {item}

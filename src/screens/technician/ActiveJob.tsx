@@ -1,14 +1,8 @@
 import { useDispatch } from "../../context/DispatchContext"
 import type { ExecutionStep, JobStatus } from "../../types/dispatch"
+import { executionSteps as steps } from "../../fixtures/requests.fixture"
 import TechnicianDirectionsMap from "../../components/TechnicianDirectionsMap"
 
-const steps: { id: ExecutionStep label: string detail: string }[] = [
-  { id: "accepted", label: "Accepted", detail: "Job accepted" },
-  { id: "en-route", label: "En route", detail: "Heading to customer" },
-  { id: "arrived", label: "Arrived", detail: "At the service address" },
-  { id: "in-progress", label: "Working", detail: "Repair in progress" },
-  { id: "completed", label: "Completed", detail: "Close out the job" },
-]
 
 export default function ActiveJob() {
   const { job, updateJobStatus } = useDispatch()

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import type { Screen } from '../../data/mockData';
-import { chatMessages, quickReplies, technicians } from '../../data/mockData';
-import Header from '../../components/Header';
+import type { Screen } from '../../types/navigation';
+import { chatMessages, quickReplies } from '../../fixtures/content.fixture';
+import { usePrimaryTechnician } from '../../hooks/useTechnicians';
 
 interface Props {
   navigate: (s: Screen) => void;
@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default function Chat({ navigate, onBack }: Props) {
-  const tech = technicians[0];
+  const tech = usePrimaryTechnician();
   const [messages, setMessages] = useState(chatMessages);
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);

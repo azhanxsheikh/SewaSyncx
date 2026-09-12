@@ -1,6 +1,7 @@
 import { useState } from "react"
-import type { Screen } from "../data/mockData"
-import { familyMembers, serviceCategories } from "../data/mockData"
+import type { Screen } from "../types/navigation"
+import { useFamilyMember, useFamilyMembers } from "../hooks/useAccount"
+import { useServiceCategories } from "../hooks/useServiceCatalog"
 import Header from "../components/Header"
 import MapView from "../components/MapView"
 import BottomNav from "../components/BottomNav"
@@ -23,8 +24,9 @@ export default function FamilySOS({
   selectedMember,
   setSelectedMember,
 }: Props) {
-  const member =
-    familyMembers.find((m) => m.id === selectedMember) || familyMembers[0]
+  const familyMembers = useFamilyMembers()
+  const member = useFamilyMember(selectedMember)
+  const serviceCategories = useServiceCategories()
   const { submitSOSRequest } = useDispatch()
   const [selectedService, setSelectedService] = useState("electrical")
   const [error, setError] = useState("")

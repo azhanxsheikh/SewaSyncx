@@ -12,6 +12,14 @@ logs/
 .claude-replay.*
 .tmp-*
 
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/
+
 # Platform-managed agentplat state, not project source. In the
 # client-initiated single-repo workspace layout (make's `Path: "."` spec) the
 # repo root IS the workspace root, so these land inside this repo rather than

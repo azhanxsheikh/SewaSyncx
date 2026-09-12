@@ -1,5 +1,6 @@
-import type { Screen } from '../data/mockData';
-import { savedAddresses } from '../data/mockData';
+import type { Screen } from '../types/navigation';
+import { accountMenuItems, supportMenuItems } from '../fixtures/account.fixture';
+import { useClientProfile, useClientStats, useSavedAddresses } from '../hooks/useAccount';
 import Header from '../components/Header';
 import BottomNav from '../components/BottomNav';
 
@@ -8,6 +9,10 @@ interface Props {
 }
 
 export default function Profile({ navigate }: Props) {
+  const profile = useClientProfile();
+  const stats = useClientStats();
+  const savedAddresses = useSavedAddresses();
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       <Header title="Profile" showNotification onNotification={() => navigate('notifications')} />
@@ -17,12 +22,12 @@ export default function Profile({ navigate }: Props) {
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="font-display font-800 text-2xl text-blue-600">A</span>
+              <span className="font-display font-800 text-2xl text-blue-600">{profile.initial}</span>
             </div>
             <div className="flex-1">
-              <h2 className="font-display font-800 text-xl text-gray-900">Abdullah Khan</h2>
-              <p className="text-sm text-gray-500">+91 99876 54321</p>
-              <p className="text-sm text-gray-500">abdullah.khan@gmail.com</p>
+              <h2 className="font-display font-800 text-xl text-gray-900">{profile.name}</h2>
+              <p className="text-sm text-gray-500">{profile.phone}</p>
+              <p className="text-sm text-gray-500">{profile.email}</p>
             </div>
             <button className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors">
               <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -33,15 +38,15 @@ export default function Profile({ navigate }: Props) {
 
           <div className="mt-4 grid grid-cols-3 gap-3 pt-4 border-t border-gray-100">
             <div className="text-center">
-              <p className="font-display font-800 text-2xl text-gray-900">12</p>
+              <p className="font-display font-800 text-2xl text-gray-900">{stats.servicesUsed}</p>
               <p className="text-xs text-gray-500">Services</p>
             </div>
             <div className="text-center border-x border-gray-100">
-              <p className="font-display font-800 text-2xl text-gray-900">3</p>
+              <p className="font-display font-800 text-2xl text-gray-900">{stats.sosUsed}</p>
               <p className="text-xs text-gray-500">SOS used</p>
             </div>
             <div className="text-center">
-              <p className="font-display font-800 text-2xl text-gray-900">4.8</p>
+              <p className="font-display font-800 text-2xl text-gray-900">{stats.averageRating}</p>
               <p className="text-xs text-gray-500">Avg rating</p>
             </div>
           </div>
@@ -73,12 +78,7 @@ export default function Profile({ navigate }: Props) {
         {/* Settings */}
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <p className="px-4 pt-4 pb-2 font-display font-700 text-gray-900">Account</p>
-          {[
-            { icon: '🔔', label: 'Notifications', desc: 'Push & SMS alerts' },
-            { icon: '🔒', label: 'Privacy & Security', desc: 'Data & location settings' },
-            { icon: '💳', label: 'Payment Methods', desc: 'UPI, cards, net banking' },
-            { icon: '👥', label: 'Family Members', desc: '3 members saved' },
-          ].map((item, i) => (
+          {accountMenuItems.map((item, i) => (
             <button
               key={item.label}
               onClick={() => item.label === 'Family Members' ? navigate('family') : undefined}
@@ -99,11 +99,7 @@ export default function Profile({ navigate }: Props) {
         {/* Support */}
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <p className="px-4 pt-4 pb-2 font-display font-700 text-gray-900">Help & Support</p>
-          {[
-            { icon: '💬', label: 'Contact Support', desc: '24/7 assistance' },
-            { icon: '⭐', label: 'Rate the App', desc: 'Share your feedback' },
-            { icon: '📜', label: 'Terms & Privacy', desc: 'Legal documents' },
-          ].map((item, i) => (
+          {supportMenuItems.map((item, i) => (
             <button
               key={item.label}
               className={`w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left ${i < 2 ? 'border-b border-gray-50' : ''}`}

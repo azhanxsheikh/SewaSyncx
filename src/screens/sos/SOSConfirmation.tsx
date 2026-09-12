@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Screen } from '../../data/mockData';
+import type { Screen } from '../../types/navigation';
 import { useOptionalDispatch } from '../../context/DispatchContext';
 
 interface Props {

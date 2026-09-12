@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react';
-import type { Screen } from './data/mockData';
+import type { Screen } from './types/navigation';
 
 import Home from './screens/Home';
 import ServiceSelect from './screens/sos/ServiceSelect';

@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import type { Screen } from '../../data/mockData';
-import { serviceCategories } from '../../data/mockData';
+import type { Screen } from '../../types/navigation';
+import { useServiceCategories } from '../../hooks/useServiceCatalog';
 import Header, { SOSProgress } from '../../components/Header';
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
 }
 
 export default function ServiceSelect({ navigate, onBack, setSelectedService }: Props) {
+  const serviceCategories = useServiceCategories();
   const [hovered, setHovered] = useState<string | null>(null);
 
   const handleSelect = (id: string) => {

@@ -9,6 +9,7 @@
     "dev:all": "pnpm --parallel --filter clients --filter technician dev",
     "build": "vite build",
     "preview": "vite preview",
+    "type-check": "tsc --noEmit",
     "format": "oxfmt"
   },
   "dependencies": {

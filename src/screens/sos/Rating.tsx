@@ -1,15 +1,14 @@
 import { useState } from 'react';
-import type { Screen } from '../../data/mockData';
-import { technicians } from '../../data/mockData';
+import type { Screen } from '../../types/navigation';
+import { usePrimaryTechnician } from '../../hooks/useTechnicians';
+import { ratingLabels, reviewTags as tags, tipOptions } from '../../fixtures/billing.fixture';
 
 interface Props {
   navigate: (s: Screen) => void;
 }
 
-const tags = ['Professional', 'Fast', 'Polite', 'Skilled', 'Transparent pricing', 'Clean work', 'On time', 'Well equipped'];
-
 export default function Rating({ navigate }: Props) {
-  const tech = technicians[0];
+  const tech = usePrimaryTechnician();
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -24,10 +23,6 @@ export default function Rating({ navigate }: Props) {
   };
 
   const displayRating = hoverRating || rating;
-
-  const ratingLabels: Record<number, string> = {
-    1: 'Poor', 2: 'Below average', 3: 'Good', 4: 'Very good', 5: 'Excellent!',
-  };
 
   if (submitted) {
     return (
@@ -123,7 +118,7 @@ export default function Rating({ navigate }: Props) {
           <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 mb-4 fade-in">
             <p className="font-600 text-amber-800 text-sm mb-2">Leave a tip for Rahul? 🙏</p>
             <div className="flex gap-2">
-              {['₹20', '₹50', '₹100', 'Custom'].map((tip) => (
+              {tipOptions.map((tip) => (
                 <button
                   key={tip}
                   className="flex-1 py-2 bg-white border border-amber-200 rounded-lg text-xs font-600 text-amber-700 hover:bg-amber-100 transition-colors"

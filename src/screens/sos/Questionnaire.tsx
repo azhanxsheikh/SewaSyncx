@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import type { Screen } from '../../data/mockData';
+import type { Screen } from '../../types/navigation';
 import Header, { SOSProgress } from '../../components/Header';
+import { useDiagnosticQuestions } from '../../hooks/useServiceCatalog';
 
 interface Props {
   navigate: (s: Screen) => void;
@@ -8,28 +9,8 @@ interface Props {
   selectedService: string;
 }
 
-const questions: Record<string, { q: string; opts: string[] }[]> = {
-  electrical: [
-    { q: 'What is affected?', opts: ['Entire home', 'One room', 'One appliance', 'Not sure'] },
-    { q: 'Is there smoke, sparks, or burning smell?', opts: ['Yes', 'No', 'Not sure'] },
-    { q: 'When did this start?', opts: ['Just now', 'A few hours ago', 'Yesterday', 'A few days ago'] },
-  ],
-  plumbing: [
-    { q: 'What is the issue?', opts: ['Burst pipe', 'Blocked drain', 'Leaking tap', 'No water supply', 'Other'] },
-    { q: 'Is water damaging the property?', opts: ['Yes, actively', 'Some dampness', 'No, contained'] },
-  ],
-  ac: [
-    { q: 'What is the problem?', opts: ['No cooling', 'No power', 'Unusual noise', 'Water dripping', 'Remote not working'] },
-    { q: 'How old is the AC?', opts: ['Less than 2 years', '2–5 years', '5–10 years', 'More than 10 years'] },
-  ],
-  default: [
-    { q: "What best describes the issue?", opts: ["Completely stopped working", "Working poorly", "Making strange sounds", "Visible damage"] },
-    { q: 'Is there any immediate safety risk?', opts: ['Yes', 'No', 'Not sure'] },
-  ],
-};
-
 export default function Questionnaire({ navigate, onBack, selectedService }: Props) {
-  const qs = questions[selectedService] || questions.default;
+  const qs = useDiagnosticQuestions(selectedService);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [showWarning, setShowWarning] = useState(false);
 

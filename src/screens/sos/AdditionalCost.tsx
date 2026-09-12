@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import type { Screen } from '../../data/mockData';
-import { technicians } from '../../data/mockData';
+import type { Screen } from '../../types/navigation';
+import { usePrimaryTechnician } from '../../hooks/useTechnicians';
+import { additionalWorkRequest } from '../../fixtures/billing.fixture';
 
 interface Props {
   navigate: (s: Screen) => void;
@@ -8,7 +9,7 @@ interface Props {
 }
 
 export default function AdditionalCost({ navigate, onBack }: Props) {
-  const tech = technicians[0];
+  const tech = usePrimaryTechnician();
   const [approving, setApproving] = useState(false);
 
   const handleApprove = () => {
@@ -45,12 +46,12 @@ export default function AdditionalCost({ navigate, onBack }: Props) {
         <div className="bg-gray-50 rounded-2xl p-4 mb-5">
           <p className="text-xs text-gray-500 font-500 mb-1">Reason for additional charge</p>
           <p className="text-gray-900 text-sm leading-relaxed">
-            The main switchboard has a faulty MCB (Miniature Circuit Breaker) that needs replacement. This part was not visible during initial diagnosis and must be replaced to safely restore power.
+            {additionalWorkRequest.reason}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <span className="bg-white border border-gray-200 text-xs text-gray-600 px-2 py-1 rounded-full">MCB Replacement</span>
-            <span className="bg-white border border-gray-200 text-xs text-gray-600 px-2 py-1 rounded-full">Safety Issue</span>
-            <span className="bg-white border border-gray-200 text-xs text-gray-600 px-2 py-1 rounded-full">Electrical Hazard</span>
+            {additionalWorkRequest.tags.map((tag) => (
+              <span key={tag} className="bg-white border border-gray-200 text-xs text-gray-600 px-2 py-1 rounded-full">{tag}</span>
+            ))}
           </div>
         </div>
 

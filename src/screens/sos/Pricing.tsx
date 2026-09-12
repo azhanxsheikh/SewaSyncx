@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import type { Screen, ServiceCategory } from '../../data/mockData';
-import { serviceCategories } from '../../data/mockData';
+import type { Screen } from '../../types/navigation';
+import type { ServiceCategory } from '../../types/domain';
+import { useServiceCategory } from '../../hooks/useServiceCatalog';
 import Header, { SOSProgress } from '../../components/Header';
 
 interface Props {
@@ -13,7 +14,7 @@ interface Props {
 export default function Pricing({ navigate, onBack, selectedService, priority }: Props) {
   const [expanded, setExpanded] = useState(false);
 
-  const cat: ServiceCategory = serviceCategories.find(c => c.id === selectedService) || serviceCategories[0];
+  const cat: ServiceCategory = useServiceCategory(selectedService);
   const priorityMultiplier = priority === 'high' ? 1.3 : priority === 'medium' ? 1.1 : 1.0;
   const basePrice = cat.basePrice;
   const emergencyFee = cat.emergencyFee;

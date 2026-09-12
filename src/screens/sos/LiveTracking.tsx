@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import type L from "leaflet"
-import type { Screen } from "../../data/mockData"
-import { technicians } from "../../data/mockData"
+import type { Screen } from "../../types/navigation"
+import { useTechnicianProfile } from "../../hooks/useTechnicians"
+import { trackingStages as statuses } from "../../fixtures/requests.fixture"
 import LeafletLocationMap from "../../components/LeafletLocationMap"
 import { useDispatch } from "../../context/DispatchContext"
 
@@ -9,18 +10,9 @@ interface Props {
   navigate: (s: Screen) => void
 }
 
-const statuses = [
-  { label: "Assigned", done: true },
-  { label: "On the way", done: true, active: true },
-  { label: "Arriving", done: false },
-  { label: "Arrived", done: false },
-]
-
 export default function LiveTracking({ navigate }: Props) {
   const { job, setStatus } = useDispatch()
-  const tech = job?.technicianId
-    ? technicians.find((item) => item.id === job.technicianId)
-    : undefined
+  const tech = useTechnicianProfile(job?.technicianId)
   const [eta, setEta] = useState(8)
   const [progress, setProgress] = useState(0.15)
   const mapRef = useRef<L.Map | null>(null)

@@ -1,22 +1,16 @@
 import { useEffect, useState } from 'react';
-import type { Screen } from '../../data/mockData';
-import { technicians } from '../../data/mockData';
+import type { Screen } from '../../types/navigation';
+import { usePrimaryTechnician } from '../../hooks/useTechnicians';
+import { serviceTimelineStages as stages } from '../../fixtures/requests.fixture';
 import { useDispatch } from '../../context/DispatchContext';
 
 interface Props {
   navigate: (s: Screen) => void;
 }
 
-const stages = [
-  { label: 'Technician arrived', time: '2:42 PM', done: true },
-  { label: 'Diagnosing issue...', time: '2:45 PM', done: true, active: false },
-  { label: 'Repair in progress', time: '2:52 PM', done: false, active: true },
-  { label: 'Repair completed', time: '--', done: false },
-];
-
 export default function ServiceInProgress({ navigate }: Props) {
   const { job } = useDispatch();
-  const tech = technicians[0];
+  const tech = usePrimaryTechnician();
   const [elapsed, setElapsed] = useState(0);
   const [currentStage, setCurrentStage] = useState(2);
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import type { Screen } from '../data/mockData';
-import { bookingHistory } from '../data/mockData';
+import type { Screen } from '../types/navigation';
+import { bookingFilterTabs as tabs } from '../fixtures/requests.fixture';
+import { useFilteredRequests } from '../hooks/useRequests';
 import Header from '../components/Header';
 import BottomNav from '../components/BottomNav';
 
@@ -8,18 +9,9 @@ interface Props {
   navigate: (s: Screen) => void;
 }
 
-const tabs = ['All', 'SOS', 'Scheduled', 'Cancelled'];
-
 export default function BookingHistory({ navigate }: Props) {
   const [activeTab, setActiveTab] = useState('All');
-
-  const filtered = bookingHistory.filter(b => {
-    if (activeTab === 'All') return true;
-    if (activeTab === 'SOS') return b.type === 'sos';
-    if (activeTab === 'Scheduled') return b.type === 'scheduled';
-    if (activeTab === 'Cancelled') return b.status === 'Cancelled';
-    return true;
-  });
+  const filtered = useFilteredRequests(activeTab);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">

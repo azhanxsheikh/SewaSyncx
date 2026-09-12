@@ -18,6 +18,7 @@ import type {
   TechnicianProfile,
 } from "../types/dispatch"
 import { forwardGeocode } from "../utils/geocoding"
+import { defaultConfirmedLocation } from "../fixtures/account.fixture"
 
 const CHANNEL_NAME = "sos-dispatch"
 const STORAGE_KEY = "sos-dispatch-job"
@@ -84,7 +85,7 @@ interface DispatchContextValue {
   ) => DispatchJob
   submitSOSRequest: (
     input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude">> & {
-      locationOverride?: { address: string area: string }
+      locationOverride?: { address: string; area: string }
       requestedFor?: {
         memberId: string
         name: string
@@ -187,12 +188,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
     })
   const [technicianOnline, setTechnicianOnline] = useState(true)
   const [confirmedLocation, setConfirmedLocation] = useState<ConfirmedLocation>(
-    {
-      id: "a1",
-      label: "Home",
-      fullAddress: "B-204, Gaur City 2, Greater Noida West",
-      area: "Greater Noida, UP 201318",
-    },
+    defaultConfirmedLocation,
   )
   const updateSosDraft = useCallback(
     (
@@ -367,7 +363,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
   const submitSOSRequest = useCallback(
     (
       input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude">> & {
-        locationOverride?: { address: string area: string }
+        locationOverride?: { address: string; area: string }
         requestedFor?: {
           memberId: string
           name: string

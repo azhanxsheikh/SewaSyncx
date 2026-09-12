@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import type { Screen } from '../../data/mockData';
-import { technicians } from '../../data/mockData';
+import type { Screen } from '../../types/navigation';
+import { usePrimaryTechnician } from '../../hooks/useTechnicians';
 import { useDispatch } from '../../context/DispatchContext';
 
 interface Props {
@@ -9,7 +9,7 @@ interface Props {
 
 export default function TechnicianArrived({ navigate }: Props) {
   const { job, updateJobStatus } = useDispatch();
-  const tech = technicians[0];
+  const tech = usePrimaryTechnician();
 
   useEffect(() => {
     if (job?.status === 'in-progress') navigate('sos-inprogress');

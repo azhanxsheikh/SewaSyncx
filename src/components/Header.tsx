@@ -1,5 +1,3 @@
-import type { Screen } from '../data/mockData';
-
 interface HeaderProps {
   title?: string;
   onBack?: () => void;

@@ -1,18 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Screen } from '../../data/mockData';
+import type { Screen } from '../../types/navigation';
 import Header, { SOSProgress } from '../../components/Header';
 import { resizeFileToBase64, useDispatch } from '../../context/DispatchContext';
+import { symptomTags as symptoms } from '../../fixtures/services.fixture';
 import type { DispatchAttachment } from '../../types/dispatch';
 
 interface Props {
   navigate: (s: Screen) => void;
   onBack: () => void;
 }
-
-const symptoms = [
-  'Water leaking', 'No electricity', 'Strange noise', 'Smoke / burning smell',
-  'AC not cooling', "Door won't open", 'Sparks / short circuit', 'Gas smell', 'Other',
-];
 
 export default function PhotoUpload({ navigate, onBack }: Props) {
   const { updateSosDraft } = useDispatch();

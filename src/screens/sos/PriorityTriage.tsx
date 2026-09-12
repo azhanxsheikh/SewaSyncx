@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import type { Screen } from '../../data/mockData';
+import type { Screen } from '../../types/navigation';
 import Header, { SOSProgress } from '../../components/Header';
+import { usePriorityLevels } from '../../hooks/useServiceCatalog';
 
 interface Props {
   navigate: (s: Screen) => void;
@@ -9,49 +10,8 @@ interface Props {
   selectedService: string;
 }
 
-const priorities = [
-  {
-    id: 'high',
-    label: 'HIGH',
-    emoji: '🔴',
-    title: 'Immediate assistance required',
-    description: 'Active water leakage, electrical hazard, locked out, no access to home, or another issue requiring immediate help.',
-    eta: 'ETA: 15–30 min',
-    bg: 'bg-red-50',
-    border: 'border-red-300',
-    labelBg: 'bg-red-500',
-    labelText: 'text-white',
-    etaColor: 'text-red-600',
-  },
-  {
-    id: 'medium',
-    label: 'MEDIUM',
-    emoji: '🟡',
-    title: 'Needs attention soon',
-    description: 'AC not cooling, slow drain, door not latching properly, or a problem that is inconvenient but not dangerous.',
-    eta: 'ETA: 30–60 min',
-    bg: 'bg-amber-50',
-    border: 'border-amber-300',
-    labelBg: 'bg-amber-500',
-    labelText: 'text-white',
-    etaColor: 'text-amber-600',
-  },
-  {
-    id: 'low',
-    label: 'LOW',
-    emoji: '🟢',
-    title: 'Can wait a little while',
-    description: 'Minor repair, cosmetic issue, or something that is not causing immediate disruption or risk.',
-    eta: 'ETA: 1–2 hrs',
-    bg: 'bg-emerald-50',
-    border: 'border-emerald-300',
-    labelBg: 'bg-emerald-500',
-    labelText: 'text-white',
-    etaColor: 'text-emerald-600',
-  },
-];
-
 export default function PriorityTriage({ navigate, onBack, setPriority, selectedService }: Props) {
+  const priorities = usePriorityLevels();
   const [selected, setSelected] = useState<string | null>(null);
 
   const handleContinue = () => {

@@ -1,4 +1,4 @@
-import type { Technician } from '../data/mockData';
+import type { Technician } from '../types/domain';
 
 interface TechnicianCardProps {
   tech: Technician;

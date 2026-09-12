@@ -1,5 +1,12 @@
-import type { Screen } from '../data/mockData';
-import { serviceCategories, bookingHistory, familyMembers } from '../data/mockData';
+import type { Screen } from '../types/navigation';
+import {
+  homeScheduledShortcuts,
+  howItWorksSteps,
+  platformFeatures,
+} from '../fixtures/content.fixture';
+import { useServiceCategories } from '../hooks/useServiceCatalog';
+import { useClientProfile, useFamilyMembers } from '../hooks/useAccount';
+import { useRecentRequests } from '../hooks/useRequests';
 import BottomNav from '../components/BottomNav';
 
 interface HomeProps {
@@ -7,6 +14,11 @@ interface HomeProps {
 }
 
 export default function Home({ navigate }: HomeProps) {
+  const profile = useClientProfile();
+  const serviceCategories = useServiceCategories();
+  const familyMembers = useFamilyMembers();
+  const recentBookings = useRecentRequests(2);
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Top Navigation */}
@@ -45,13 +57,13 @@ export default function Home({ navigate }: HomeProps) {
         {/* Greeting */}
         <div>
           <p className="text-sm text-gray-500">Good afternoon,</p>
-          <h1 className="font-display font-800 text-2xl text-gray-900">Abdullah 👋</h1>
+          <h1 className="font-display font-800 text-2xl text-gray-900">{profile.greetingName} 👋</h1>
           <p className="text-sm text-gray-500 mt-0.5 flex items-center gap-1">
             <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            Gaur City 2, Greater Noida West
+            {profile.areaLabel}
           </p>
         </div>
 
@@ -139,12 +151,7 @@ export default function Home({ navigate }: HomeProps) {
             </button>
           </div>
           <div className="grid grid-cols-4 gap-2">
-            {[
-              { icon: '🧹', name: 'Cleaning', id: 'cleaning' },
-              { icon: '⚡', name: 'Electrician', id: 'electrical' },
-              { icon: '💧', name: 'Plumber', id: 'plumbing' },
-              { icon: '🖌️', name: 'Painting', id: 'painting' },
-            ].map((s) => (
+            {homeScheduledShortcuts.map((s) => (
               <button
                 key={s.id}
                 onClick={() => navigate('scheduled-category')}
@@ -200,7 +207,7 @@ export default function Home({ navigate }: HomeProps) {
             <button onClick={() => navigate('bookings')} className="text-blue-500 text-sm font-500">View all →</button>
           </div>
           <div className="space-y-2">
-            {bookingHistory.slice(0, 2).map((b) => (
+            {recentBookings.map((b) => (
               <button
                 key={b.id}
                 onClick={() => navigate('bookings')}
@@ -226,14 +233,7 @@ export default function Home({ navigate }: HomeProps) {
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <h2 className="font-display font-700 text-gray-900 mb-4">Why SOS HomeFix?</h2>
           <div className="grid grid-cols-2 gap-3">
-            {[
-              { icon: '✅', text: 'Verified Professionals' },
-              { icon: '⚡', text: 'Fast Emergency Dispatch' },
-              { icon: '💰', text: 'Transparent Pricing' },
-              { icon: '📍', text: 'Live Tech Tracking' },
-              { icon: '🔒', text: 'Secure Payments' },
-              { icon: '📞', text: '24/7 Support' },
-            ].map((f) => (
+            {platformFeatures.map((f) => (
               <div key={f.text} className="flex items-center gap-2">
                 <span className="text-base">{f.icon}</span>
                 <span className="text-xs text-gray-600 font-500">{f.text}</span>
@@ -246,12 +246,7 @@ export default function Home({ navigate }: HomeProps) {
         <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
           <h2 className="font-display font-700 text-gray-900 mb-4">How it works</h2>
           <div className="space-y-3">
-            {[
-              { n: '1', t: 'Request help', d: 'Tap SOS and describe your problem' },
-              { n: '2', t: 'We match a technician', d: 'Nearest verified professional dispatched' },
-              { n: '3', t: 'Track their arrival', d: 'Live map tracking with ETA updates' },
-              { n: '4', t: 'Problem solved', d: 'Pay after service, get digital invoice' },
-            ].map((step) => (
+            {howItWorksSteps.map((step) => (
               <div key={step.n} className="flex items-start gap-3">
                 <div className="w-7 h-7 rounded-full bg-red-50 text-red-500 font-display font-700 text-sm flex items-center justify-center flex-shrink-0">
                   {step.n}

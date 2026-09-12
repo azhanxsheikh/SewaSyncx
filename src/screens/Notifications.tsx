@@ -1,5 +1,5 @@
-import type { Screen } from '../data/mockData';
-import { notifications } from '../data/mockData';
+import type { Screen } from '../types/navigation';
+import { useNotifications } from '../hooks/useAccount';
 import Header from '../components/Header';
 
 interface Props {
@@ -8,6 +8,8 @@ interface Props {
 }
 
 export default function Notifications({ navigate, onBack }: Props) {
+  const notifications = useNotifications();
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header title="Notifications" onBack={onBack} showNotification={false} />

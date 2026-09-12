@@ -1,4 +1,4 @@
-import type { Screen } from '../data/mockData';
+import type { Screen } from '../types/navigation';
 
 interface BottomNavProps {
   screen: Screen;

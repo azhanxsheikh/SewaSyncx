@@ -58,12 +58,24 @@ export interface ConfirmedLocation {
   longitude?: number
 }
 
-export type DispatchEvent = { type: "job-created" job: DispatchJob } | {
-  type: "job-updated"
-  job: DispatchJob
-} | { type: "NEW_REQUEST" request: DispatchJob } | {
-  type: "ACCEPTED" | "STATUS"
-  requestId: string
-  status: JobStatus
+/**
+ * Transport-level fields. Every field is optional here because an event arrives
+ * from an untrusted channel (BroadcastChannel / localStorage / the dev bridge)
+ * and handlers probe these fields before narrowing on `type`.
+ */
+interface DispatchEventPayload {
   job?: DispatchJob
+  request?: DispatchJob
+  requestId?: string
+  status?: JobStatus
 }
+
+export type DispatchEvent =
+  | (DispatchEventPayload & { type: "job-created"; job: DispatchJob })
+  | (DispatchEventPayload & { type: "job-updated"; job: DispatchJob })
+  | (DispatchEventPayload & { type: "NEW_REQUEST"; request: DispatchJob })
+  | (DispatchEventPayload & {
+    type: "ACCEPTED" | "STATUS"
+    requestId: string
+    status: JobStatus
+  })

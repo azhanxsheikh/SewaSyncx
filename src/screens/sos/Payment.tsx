@@ -1,18 +1,12 @@
 import { useState } from 'react';
-import type { Screen } from '../../data/mockData';
+import type { Screen } from '../../types/navigation';
 import Header from '../../components/Header';
+import { paymentMethods as methods, upiApps } from '../../fixtures/billing.fixture';
 
 interface Props {
   navigate: (s: Screen) => void;
   onBack: () => void;
 }
-
-const methods = [
-  { id: 'upi', label: 'UPI', icon: '📱', desc: 'Google Pay, PhonePe, Paytm, etc.' },
-  { id: 'card', label: 'Credit / Debit Card', icon: '💳', desc: 'Visa, Mastercard, RuPay' },
-  { id: 'netbanking', label: 'Net Banking', icon: '🏦', desc: 'All major Indian banks' },
-  { id: 'cash', label: 'Cash', icon: '💵', desc: 'Pay the technician directly' },
-];
 
 export default function Payment({ navigate, onBack }: Props) {
   const [selected, setSelected] = useState('upi');
@@ -72,7 +66,7 @@ export default function Payment({ navigate, onBack }: Props) {
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-400 focus:bg-white transition-all"
             />
             <div className="mt-3 flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-              {['GPay', 'PhonePe', 'Paytm', 'BHIM'].map((app) => (
+              {upiApps.map((app) => (
                 <button
                   key={app}
                   className="flex-shrink-0 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-700 hover:border-blue-300 hover:bg-blue-50 transition-colors"

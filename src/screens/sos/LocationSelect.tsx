@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Screen } from '../../data/mockData';
-import { savedAddresses } from '../../data/mockData';
+import type { Screen } from '../../types/navigation';
+import { useSavedAddresses } from '../../hooks/useAccount';
 import Header, { SOSProgress } from '../../components/Header';
 import LeafletLocationMap, { reverseGeocode } from '../../components/LeafletLocationMap';
 import { useDispatch } from '../../context/DispatchContext';
 import type { ConfirmedLocation } from '../../types/dispatch';
+import type { SavedAddress } from '../../types/domain';
 
 interface Props {
   navigate: (s: Screen) => void;
@@ -13,6 +14,7 @@ interface Props {
 
 export default function LocationSelect({ navigate, onBack }: Props) {
   const { confirmedLocation, setConfirmedLocation } = useDispatch();
+  const savedAddresses = useSavedAddresses();
   const [selected, setSelected] = useState('a1');
   const [mapLocation, setMapLocation] = useState(confirmedLocation.fullAddress);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number; accuracy?: number; address?: string } | null>(null);
@@ -83,7 +85,7 @@ export default function LocationSelect({ navigate, onBack }: Props) {
     );
   }, [clearLocationWatch, resolveLiveLocation, updateLiveLocation]);
 
-  const selectAddress = useCallback((address: typeof savedAddresses[number]) => {
+  const selectAddress = useCallback((address: SavedAddress) => {
     clearLocationWatch();
     ++requestIdRef.current;
     setLocationState('idle');
