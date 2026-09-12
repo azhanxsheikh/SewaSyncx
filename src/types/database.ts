@@ -703,6 +703,51 @@ export type Database = {
           },
         ]
       }
+      technician_locations: {
+        Row: {
+          heading: number | null
+          id: string
+          location: unknown
+          request_id: string | null
+          speed: number | null
+          technician_id: string
+          updated_at: string
+        }
+        Insert: {
+          heading?: number | null
+          id?: string
+          location: unknown
+          request_id?: string | null
+          speed?: number | null
+          technician_id: string
+          updated_at?: string
+        }
+        Update: {
+          heading?: number | null
+          id?: string
+          location?: unknown
+          request_id?: string | null
+          speed?: number | null
+          technician_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_locations_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_locations_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       technician_profiles: {
         Row: {
           background_checked: boolean
@@ -901,6 +946,17 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      get_nearby_matching_technicians: {
+        Args: { p_radius_meters: number; p_request_id: string }
+        Returns: {
+          distance_meters: number
+          location_updated_at: string
+          rating: number
+          review_count: number
+          technician_id: string
+          total_jobs: number
+        }[]
       }
       request_execution_window: {
         Args: {
