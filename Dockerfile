@@ -16,11 +16,15 @@ RUN npm install --global --no-fund --no-audit pnpm@${PNPM_VERSION}
 WORKDIR /app
 
 # Manifests first so the dependency layer is cached until the lockfile changes.
-# --frozen-lockfile validates every workspace package, so all three manifests
-# must be present.
+# --frozen-lockfile validates every workspace package (pnpm-workspace.yaml:
+# apps/*, packages/*), so every manifest must be present. The root postinstall
+# runs scripts/patch-vite.cjs, so it is needed before install too.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/clients/package.json apps/clients/
+COPY scripts/patch-vite.cjs scripts/
+COPY apps/admin/package.json apps/admin/
+COPY apps/client/package.json apps/client/
 COPY apps/technician/package.json apps/technician/
+COPY packages/shared/package.json packages/shared/
 RUN --mount=type=cache,id=sewasync-pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile --store-dir /pnpm/store
 

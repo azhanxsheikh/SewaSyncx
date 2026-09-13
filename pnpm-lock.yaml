@@ -58,9 +58,45 @@ importers:
         specifier: ^8.0.5
         version: 8.0.5(@types/node@22.19.17)(jiti@2.6.1)
 
-  apps/clients: {}
+  apps/admin:
+    dependencies:
+      '@sewasync/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
 
-  apps/technician: {}
+  apps/client:
+    dependencies:
+      '@sewasync/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+
+  apps/technician:
+    dependencies:
+      '@sewasync/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+
+  packages/shared:
+    dependencies:
+      '@supabase/supabase-js':
+        specifier: ^2.116.0
+        version: 2.116.0
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.4(react@19.2.4)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.14)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
 
 packages:
 
