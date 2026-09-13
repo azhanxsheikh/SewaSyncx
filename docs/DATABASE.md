@@ -43,7 +43,7 @@
 
 | Type | Values | Used by |
 |---|---|---|
-| `user_role` | `client`, `technician` | `users.role` — staff are **not** represented here |
+| `user_role` | `client`, `technician`, `admin` | `users.role` |
 | `staff_role` | `support_moderator`, `super_admin` | `platform_staff.staff_role` |
 | `request_status` | `pending`, `accepted`, `en_route`, `arrived`, `in_progress`, `completed`, `cancelled`, `declined`, `unfulfilled` | `requests`, `request_status_events` |
 | `request_priority` | `low`, `medium`, `high` | `requests.priority` |

@@ -8,6 +8,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   root: path.resolve(__dirname),
+  envDir: path.resolve(__dirname, '../../'),
   server: {
     port: 3001,
     strictPort: true,

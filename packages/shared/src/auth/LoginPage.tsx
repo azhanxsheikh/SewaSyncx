@@ -65,6 +65,7 @@ export function LoginPage({
     });
 
     if (signInError) {
+      console.error("SUPABASE AUTH/DB ERROR:", signInError);
       setError(signInError.message);
       setSubmitting(false);
       return;

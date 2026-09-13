@@ -71,14 +71,15 @@ export function ClientSignUpModal({ isOpen, onClose, onSuccess }: ClientSignUpMo
         options: {
           data: {
             role: 'client',
-            full_name: fullName.trim(),
             name: fullName.trim(),
+            full_name: fullName.trim(),
             phone: phoneValidation.e164Phone,
           },
         },
       });
 
       if (signUpError) {
+        console.error("SUPABASE AUTH/DB ERROR:", signUpError);
         if (signUpError.message.toLowerCase().includes('already registered')) {
           throw new Error('An account with this email already exists. Please sign in instead.');
         }
@@ -100,17 +101,23 @@ export function ClientSignUpModal({ isOpen, onClose, onSuccess }: ClientSignUpMo
           password,
         });
         if (signInErr) {
+          console.error("SUPABASE AUTH/DB ERROR:", signInErr);
           console.warn('[signup] Auto sign-in notice:', signInErr.message);
         }
       }
 
       // 2. Ensure profile details exist in public.users
       try {
-        await supabase.rpc('complete_profile', {
+        const { error: profErr } = await supabase.rpc('complete_profile', {
           p_name: fullName.trim(),
           p_phone: phoneValidation.e164Phone,
         });
+        if (profErr) {
+          console.error("SUPABASE AUTH/DB ERROR:", profErr);
+          console.warn('[signup] complete_profile sync attempt:', profErr);
+        }
       } catch (profErr) {
+        console.error("SUPABASE AUTH/DB ERROR:", profErr);
         console.warn('[signup] complete_profile sync attempt:', profErr);
       }
 
@@ -133,6 +140,7 @@ export function ClientSignUpModal({ isOpen, onClose, onSuccess }: ClientSignUpMo
       });
 
       if (addressErr) {
+        console.error("SUPABASE AUTH/DB ERROR:", addressErr);
         console.warn('[signup] saved_address insert error:', addressErr.message);
       }
 
@@ -140,7 +148,7 @@ export function ClientSignUpModal({ isOpen, onClose, onSuccess }: ClientSignUpMo
       onSuccess?.();
       onClose();
     } catch (err: any) {
-      console.error('[signup] error:', err);
+      console.error("SUPABASE AUTH/DB ERROR:", err);
       const msg = err?.message || 'Failed to complete registration. Please try again.';
       if (msg.includes('duplicate key') || msg.includes('users_phone_key')) {
         setError('This phone number is already registered to another account.');

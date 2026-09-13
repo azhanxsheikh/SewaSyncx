@@ -1427,7 +1427,7 @@ export type Database = {
         | "technician_ghosted"
         | "system_timeout"
         | "admin_override"
-      user_role: "client" | "technician"
+      user_role: "client" | "technician" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1621,7 +1621,7 @@ export const Constants = {
         "system_timeout",
         "admin_override",
       ],
-      user_role: ["client", "technician"],
+      user_role: ["client", "technician", "admin"],
     },
   },
 } as const

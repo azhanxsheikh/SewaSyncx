@@ -180,14 +180,15 @@ export function TechnicianSignUpModal({ isOpen, onClose, onSuccess }: Technician
         options: {
           data: {
             role: 'technician',
-            full_name: fullName.trim(),
             name: fullName.trim(),
+            full_name: fullName.trim(),
             phone: check.e164Phone,
           },
         },
       });
 
       if (signUpError) {
+        console.error("SUPABASE AUTH/DB ERROR:", signUpError);
         if (signUpError.message.toLowerCase().includes('already registered')) {
           throw new Error('An account with this email already exists. Please sign in instead.');
         }
@@ -206,6 +207,7 @@ export function TechnicianSignUpModal({ isOpen, onClose, onSuccess }: Technician
           password,
         });
         if (signInErr) {
+          console.error("SUPABASE AUTH/DB ERROR:", signInErr);
           console.warn('[signup] auto sign-in notice:', signInErr.message);
         }
       }
@@ -228,10 +230,18 @@ export function TechnicianSignUpModal({ isOpen, onClose, onSuccess }: Technician
         });
 
         if (rpcErr) {
+          console.error("SUPABASE AUTH/DB ERROR:", rpcErr);
           console.warn('[signup] register_technician_profile RPC message:', rpcErr.message);
           // Fallback direct inserts if RPC had unexpected error
-          await supabase.from('users').update({ role: 'technician', phone: check.e164Phone } as any).eq('id', createdUser.id);
-          await supabase.from('technician_profiles').insert({
+          const { error: userUpdErr } = await supabase
+            .from('users')
+            .update({ role: 'technician', name: fullName.trim(), phone: check.e164Phone } as any)
+            .eq('id', createdUser.id);
+          if (userUpdErr) {
+            console.error("SUPABASE AUTH/DB ERROR:", userUpdErr);
+          }
+
+          const { error: techProfileErr } = await supabase.from('technician_profiles').insert({
             id: createdUser.id,
             vehicle_type: vehicleType,
             vehicle_registration: vehicleNumber.trim() || null,
@@ -240,21 +250,28 @@ export function TechnicianSignUpModal({ isOpen, onClose, onSuccess }: Technician
             skill_verified: false,
             background_checked: false,
           } as any);
+          if (techProfileErr) {
+            console.error("SUPABASE AUTH/DB ERROR:", techProfileErr);
+          }
 
           const catInserts = selectedCategoryIds.map((cId) => ({
             technician_id: createdUser.id,
             category_id: cId,
           }));
-          await supabase.from('technician_categories').insert(catInserts as any);
+          const { error: techCatErr } = await supabase.from('technician_categories').insert(catInserts as any);
+          if (techCatErr) {
+            console.error("SUPABASE AUTH/DB ERROR:", techCatErr);
+          }
         }
       } catch (insertErr) {
+        console.error("SUPABASE AUTH/DB ERROR:", insertErr);
         console.warn('[signup] profile registration fallback:', insertErr);
       }
 
       setSubmitting(false);
       setIsSuccessAcknowledged(true);
     } catch (err: any) {
-      console.error('[signup] error:', err);
+      console.error("SUPABASE AUTH/DB ERROR:", err);
       const msg = err?.message || 'Failed to complete registration. Please try again.';
       if (msg.includes('duplicate key') || msg.includes('users_phone_key')) {
         setError('This phone number is already registered to another account.');
