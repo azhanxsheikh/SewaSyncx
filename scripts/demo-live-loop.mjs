@@ -3,7 +3,9 @@
 //
 // Exercises the seeded Greater Noida demo (supabase/seed.sql) through the real
 // auth, PostgREST, Realtime and Storage endpoints, signed in as each persona.
-// The portals do not read the database yet, so this is the end-to-end check.
+// The portals authenticate against this same backend now (src/context/
+// AuthContext.tsx), but still render fixture data for everything past login
+// — this script remains the only end-to-end check of the real data.
 //
 // Usage:   node scripts/demo-live-loop.mjs          (Node 22+, no dependencies)
 // Replay:  supabase db reset                        (the loop consumes Scenario A)
@@ -12,13 +14,13 @@ import { execSync } from 'node:child_process';
 
 const API = process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321';
 const ANON_KEY = process.env.SUPABASE_ANON_KEY ?? readLocalAnonKey();
-const PASSWORD = 'SewaSync@2026';
+const PASSWORD = 'Password@123';
 
 const PEOPLE = {
-  abdullah: { email: 'abdullah@sewasync.test', label: 'Abdullah (client)' },
-  amit: { email: 'amit.singh@sewasync.test', label: 'Amit Singh', lat: 28.6139, lng: 77.4402 },
-  rahul: { email: 'rahul.kumar@sewasync.test', label: 'Rahul Kumar', lat: 28.4744, lng: 77.488 },
-  vikram: { email: 'vikram.sharma@sewasync.test', label: 'Vikram Sharma', lat: 28.4712, lng: 77.5118 },
+  abdullah: { email: 'abdullah@sewasync.in', label: 'Abdullah Sheikh (client)' },
+  amit: { email: 'amit.singh@sewasync.in', label: 'Amit Singh', lat: 28.6105, lng: 77.432 },
+  rahul: { email: 'rahul.kumar@sewasync.in', label: 'Rahul Kumar', lat: 28.4727, lng: 77.4893 },
+  vikram: { email: 'vikram.sharma@sewasync.in', label: 'Vikram Sharma', lat: 28.4712, lng: 77.5118 },
 };
 const SCENARIO = {
   A: 'aaaaaaaa-0000-4000-8000-00000000000a',
