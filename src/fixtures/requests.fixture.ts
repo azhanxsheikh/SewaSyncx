@@ -1,64 +1,9 @@
 import type { BookingRecord, TimelineStage, TrackingStage } from '../types/domain';
 import type { ExecutionStep } from '../types/dispatch';
+import { mappedBookingHistory } from '../mocks/fixtures';
 
-/** Client booking history. Maps to `requests` joined with `invoices` and `reviews`. */
-export const bookingHistory: BookingRecord[] = [
-  {
-    id: 'b1',
-    service: 'Electrical Repair',
-    icon: '⚡',
-    technician: 'Rahul Kumar',
-    date: 'Sep 5, 2026',
-    status: 'Completed',
-    amount: '₹998',
-    type: 'sos',
-    rating: 5,
-  },
-  {
-    id: 'b2',
-    service: 'AC Service & Gas Refill',
-    icon: '❄️',
-    technician: 'Amit Singh',
-    date: 'Aug 28, 2026',
-    status: 'Completed',
-    amount: '₹1,299',
-    type: 'scheduled',
-    rating: 4,
-  },
-  {
-    id: 'b3',
-    service: 'Plumbing — Drain Cleaning',
-    icon: '💧',
-    technician: 'Suresh Yadav',
-    date: 'Aug 12, 2026',
-    status: 'Completed',
-    amount: '₹649',
-    type: 'sos',
-    rating: 5,
-  },
-  {
-    id: 'b4',
-    service: 'Home Deep Cleaning',
-    icon: '🧹',
-    technician: 'Cleaning Partners',
-    date: 'Jul 30, 2026',
-    status: 'Completed',
-    amount: '₹1,199',
-    type: 'scheduled',
-    rating: 4,
-  },
-  {
-    id: 'b5',
-    service: 'Pest Control',
-    icon: '🐜',
-    technician: 'EradiCare Services',
-    date: 'Jul 18, 2026',
-    status: 'Cancelled',
-    amount: '—',
-    type: 'scheduled',
-    rating: 0,
-  },
-];
+/** Client booking history. Maps to `requests` joined with `invoices` and `reviews`. Derived from canonical DB fixtures. */
+export const bookingHistory: BookingRecord[] = mappedBookingHistory;
 
 /** Filter tabs on the client booking-history screen. */
 export const bookingFilterTabs: string[] = ['All', 'SOS', 'Scheduled', 'Cancelled'];

@@ -5,6 +5,10 @@ import type {
   NotificationRecord,
   SavedAddress,
 } from '../types/domain';
+import {
+  mappedFamilyMembers,
+  mappedSavedAddresses,
+} from '../mocks/fixtures';
 
 /** Signed-in client identity. Maps to `users`. */
 export const clientProfile = {
@@ -23,12 +27,8 @@ export const clientStats: ClientStats = {
   averageRating: 4.8,
 };
 
-/** Maps to `saved_addresses`. */
-export const savedAddresses: SavedAddress[] = [
-  { id: 'a1', label: 'Home', icon: '🏠', address: 'B-204, Gaur City 2, Greater Noida West', area: 'Greater Noida, UP 201318' },
-  { id: 'a2', label: 'Work', icon: '🏢', address: '14th Floor, Tower C, World Trade Centre', area: 'Sector 16, Noida, UP 201301' },
-  { id: 'a3', label: "Papa's Home", icon: '🏡', address: 'A-47, Sector 62', area: 'Noida, Uttar Pradesh 201309' },
-];
+/** Maps to `saved_addresses`. Derived from canonical DB fixtures. */
+export const savedAddresses: SavedAddress[] = mappedSavedAddresses;
 
 /**
  * Address options shown in the scheduled-booking flow.
@@ -50,39 +50,8 @@ export const defaultConfirmedLocation = {
   area: 'Greater Noida, UP 201318',
 };
 
-/** Maps to `family_members`. */
-export const familyMembers: FamilyMember[] = [
-  {
-    id: 'f1',
-    name: 'Papa',
-    relation: 'Father',
-    emoji: '👨',
-    address: 'A-47, Sector 62, Noida',
-    area: 'Noida, Uttar Pradesh',
-    phone: '+91 98110 45678',
-    color: 'blue',
-  },
-  {
-    id: 'f2',
-    name: 'Mummy',
-    relation: 'Mother',
-    emoji: '👩',
-    address: 'A-47, Sector 62, Noida',
-    area: 'Noida, Uttar Pradesh',
-    phone: '+91 98110 45679',
-    color: 'pink',
-  },
-  {
-    id: 'f3',
-    name: 'Dadi',
-    relation: 'Grandmother',
-    emoji: '👵',
-    address: 'H.No. 12, Lal Kuan, Delhi',
-    area: 'Old Delhi, Delhi',
-    phone: '+91 97110 23456',
-    color: 'purple',
-  },
-];
+/** Maps to `family_members`. Derived from canonical DB fixtures. */
+export const familyMembers: FamilyMember[] = mappedFamilyMembers;
 
 /** Maps to `notifications`. */
 export const notifications: NotificationRecord[] = [

@@ -116,6 +116,15 @@ export default function Profile({ navigate }: Props) {
           ))}
         </div>
 
+        {/* Admin Console */}
+        <button
+          onClick={() => navigate('admin')}
+          className="w-full py-3.5 rounded-2xl border border-gray-100 bg-white text-blue-600 font-600 text-sm hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+        >
+          <span>🛡️</span>
+          <span>Admin Operations Console</span>
+        </button>
+
         {/* Logout */}
         <button className="w-full py-3.5 rounded-2xl border border-red-100 text-red-500 font-600 text-sm hover:bg-red-50 transition-colors">
           Sign Out

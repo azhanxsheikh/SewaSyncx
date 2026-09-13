@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { useDispatch } from "../../context/DispatchContext"
+import { acceptRequestRpc } from "../../lib/supabase"
 
 export default function IncomingAlert({
   onAccepted,
@@ -31,6 +32,15 @@ export default function IncomingAlert({
       id: job?.id,
       statusBefore: job?.status,
     })
+    if (job?.id) {
+      void acceptRequestRpc(job.id, "t1").then((res) => {
+        if (res.error) {
+          console.warn("[technician] accept_request RPC error:", res.error)
+        } else {
+          console.log("[technician] accept_request RPC success:", res.data)
+        }
+      })
+    }
     acceptJob()
     onAccepted()
   }

@@ -11,6 +11,8 @@ logs/
 *.log
 .claude-replay.*
 .tmp-*
+AGENTS.md
+CLAUDE.md
 
 # OS artifacts
 .DS_Store

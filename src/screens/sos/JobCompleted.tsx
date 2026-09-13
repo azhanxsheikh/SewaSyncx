@@ -1,6 +1,7 @@
 import type { Screen } from '../../types/navigation';
 import { usePrimaryTechnician } from '../../hooks/useTechnicians';
 import { completedWorkItems } from '../../fixtures/requests.fixture';
+import { useDispatch } from '../../context/DispatchContext';
 
 interface Props {
   navigate: (s: Screen) => void;
@@ -8,6 +9,11 @@ interface Props {
 
 export default function JobCompleted({ navigate }: Props) {
   const tech = usePrimaryTechnician();
+  const { job } = useDispatch();
+  const settledAmount = job?.finalPrice ?? job?.estimatedTotal ?? 998;
+  const serviceLabel = job?.service
+    ? job.service.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+    : 'Electrical Repair';
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -22,7 +28,7 @@ export default function JobCompleted({ navigate }: Props) {
           </div>
         </div>
         <h2 className="font-display font-800 text-3xl text-white">Problem solved!</h2>
-        <p className="text-emerald-100 text-sm mt-2">Electrical repair completed successfully</p>
+        <p className="text-emerald-100 text-sm mt-2">{serviceLabel} completed successfully</p>
       </div>
 
       <div className="flex-1 px-4 pt-6 pb-24 max-w-md mx-auto w-full space-y-4">
@@ -32,11 +38,11 @@ export default function JobCompleted({ navigate }: Props) {
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-500">Service</span>
-              <span className="font-600 text-gray-900">Electrical Repair</span>
+              <span className="font-600 text-gray-900">{serviceLabel}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Technician</span>
-              <span className="font-600 text-gray-900">{tech.name}</span>
+              <span className="font-600 text-gray-900">{job?.technicianName || tech.name}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Date</span>
@@ -49,7 +55,7 @@ export default function JobCompleted({ navigate }: Props) {
             <div className="h-px bg-gray-200" />
             <div className="flex justify-between items-center">
               <span className="font-display font-700 text-gray-900">Total amount</span>
-              <span className="font-display font-800 text-2xl text-gray-900">₹998</span>
+              <span className="font-display font-800 text-2xl text-gray-900">₹{settledAmount}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Status</span>

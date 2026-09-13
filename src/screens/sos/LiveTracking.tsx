@@ -13,7 +13,7 @@ interface Props {
 export default function LiveTracking({ navigate }: Props) {
   const { job, setStatus } = useDispatch()
   const tech = useTechnicianProfile(job?.technicianId)
-  const [eta, setEta] = useState(8)
+  const [eta, setEta] = useState(15)
   const [progress, setProgress] = useState(0.15)
   const mapRef = useRef<L.Map | null>(null)
   const onMapReady = useCallback((map: L.Map) => {
@@ -74,6 +74,11 @@ export default function LiveTracking({ navigate }: Props) {
         <div className="absolute inset-0">
           <LeafletLocationMap
             initialAddress={job?.location}
+            activeCoordinates={
+              job?.serviceLatitude && job?.serviceLongitude
+                ? { latitude: job.serviceLatitude, longitude: job.serviceLongitude }
+                : undefined
+            }
             heightClass="h-full min-h-0"
             className="h-full rounded-none border-0"
             showRoute
@@ -195,7 +200,7 @@ export default function LiveTracking({ navigate }: Props) {
           <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-5">
             <div
               className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-2000"
-              style={{ width: `${(1 - eta / 8) * 100}%` }}
+              style={{ width: `${(1 - eta / 15) * 100}%` }}
             />
           </div>
 
@@ -219,7 +224,10 @@ export default function LiveTracking({ navigate }: Props) {
               </svg>
               <span className="text-xs text-blue-700 font-500">Chat</span>
             </button>
-            <button className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 transition-colors">
+            <a
+              href={`tel:${tech.phone}`}
+              className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 transition-colors"
+            >
               <svg
                 className="w-5 h-5 text-emerald-600"
                 fill="none"
@@ -234,7 +242,7 @@ export default function LiveTracking({ navigate }: Props) {
                 />
               </svg>
               <span className="text-xs text-emerald-700 font-500">Call</span>
-            </button>
+            </a>
             <button className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
               <svg
                 className="w-5 h-5 text-gray-600"

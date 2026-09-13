@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { Screen } from '../../types/navigation';
 import Header from '../../components/Header';
-import { paymentMethods as methods, upiApps } from '../../fixtures/billing.fixture';
+import { usePaymentMethods, useUpiApps } from '../../hooks/useBilling';
+import { useDispatch } from '../../context/DispatchContext';
 
 interface Props {
   navigate: (s: Screen) => void;
@@ -9,6 +10,15 @@ interface Props {
 }
 
 export default function Payment({ navigate, onBack }: Props) {
+  const { job } = useDispatch();
+  const settledAmount = job?.finalPrice ?? job?.estimatedTotal ?? 998;
+  const serviceLabel = job?.service
+    ? job.service.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+    : 'Electrical Repair';
+  const jobIdLabel = job?.id ? `#${job.id}` : '#SH-2094';
+
+  const methods = usePaymentMethods();
+  const upiApps = useUpiApps();
   const [selected, setSelected] = useState('upi');
   const [upiId, setUpiId] = useState('');
   const [paying, setPaying] = useState(false);
@@ -26,8 +36,8 @@ export default function Payment({ navigate, onBack }: Props) {
         {/* Amount due */}
         <div className="bg-gray-50 rounded-2xl border border-gray-100 p-5 mb-5 text-center">
           <p className="text-sm text-gray-500">Amount due</p>
-          <div className="font-display font-800 text-4xl text-gray-900 mt-1">₹998</div>
-          <p className="text-xs text-gray-400 mt-1">Electrical Repair · Job #SH-2094</p>
+          <div className="font-display font-800 text-4xl text-gray-900 mt-1">₹{settledAmount}</div>
+          <p className="text-xs text-gray-400 mt-1">{serviceLabel} · Job {jobIdLabel}</p>
         </div>
 
         {/* Payment methods */}
@@ -101,7 +111,7 @@ export default function Payment({ navigate, onBack }: Props) {
                 Processing payment...
               </>
             ) : (
-              <>💳 Pay ₹998</>
+              <>💳 Pay ₹{settledAmount}</>
             )}
           </button>
         </div>

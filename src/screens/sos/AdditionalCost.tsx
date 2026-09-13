@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Screen } from '../../types/navigation';
 import { usePrimaryTechnician } from '../../hooks/useTechnicians';
-import { additionalWorkRequest } from '../../fixtures/billing.fixture';
+import { useAdditionalWork } from '../../hooks/useBilling';
 
 interface Props {
   navigate: (s: Screen) => void;
@@ -10,6 +10,7 @@ interface Props {
 
 export default function AdditionalCost({ navigate, onBack }: Props) {
   const tech = usePrimaryTechnician();
+  const additionalWorkRequest = useAdditionalWork();
   const [approving, setApproving] = useState(false);
 
   const handleApprove = () => {

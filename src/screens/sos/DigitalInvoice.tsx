@@ -1,6 +1,7 @@
 import type { Screen } from '../../types/navigation';
 import { usePrimaryTechnician } from '../../hooks/useTechnicians';
-import { invoiceLineItems } from '../../fixtures/billing.fixture';
+import { useInvoiceDetails } from '../../hooks/useBilling';
+import { useDispatch } from '../../context/DispatchContext';
 import Header from '../../components/Header';
 
 interface Props {
@@ -10,6 +11,8 @@ interface Props {
 
 export default function DigitalInvoice({ navigate, onBack }: Props) {
   const tech = usePrimaryTechnician();
+  const { job } = useDispatch();
+  const { lineItems: invoiceLineItems, summary } = useInvoiceDetails(job);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -42,7 +45,7 @@ export default function DigitalInvoice({ navigate, onBack }: Props) {
               </div>
               <div>
                 <p className="text-xs text-gray-400 mb-0.5">Job ID</p>
-                <p className="font-600 text-gray-900 text-sm">#SH-2094</p>
+                <p className="font-600 text-gray-900 text-sm">{summary.jobId}</p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-400 mb-0.5">Time</p>
@@ -54,13 +57,13 @@ export default function DigitalInvoice({ navigate, onBack }: Props) {
             <div className="grid grid-cols-2 gap-4 mb-5 pb-5 border-b border-gray-100 text-sm">
               <div>
                 <p className="text-xs text-gray-400 mb-1">Billed to</p>
-                <p className="font-600 text-gray-900">Abdullah Khan</p>
-                <p className="text-gray-500 text-xs">B-204, Gaur City 2</p>
-                <p className="text-gray-500 text-xs">Greater Noida West</p>
+                <p className="font-600 text-gray-900">{summary.billedToName}</p>
+                <p className="text-gray-500 text-xs">{summary.billedToAddressLine1}</p>
+                <p className="text-gray-500 text-xs">{summary.billedToAddressLine2}</p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-400 mb-1">Technician</p>
-                <p className="font-600 text-gray-900">{tech.name}</p>
+                <p className="font-600 text-gray-900">{job?.technicianName || tech.name}</p>
                 <p className="text-gray-500 text-xs">Electrician</p>
                 <p className="text-gray-500 text-xs">⭐ {tech.rating} rating</p>
               </div>
@@ -84,7 +87,7 @@ export default function DigitalInvoice({ navigate, onBack }: Props) {
             <div className="space-y-2 pt-4 border-t border-gray-100">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Subtotal</span>
-                <span className="font-600 text-gray-900">₹998</span>
+                <span className="font-600 text-gray-900">₹{summary.subtotal}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">GST (0%)</span>
@@ -92,7 +95,7 @@ export default function DigitalInvoice({ navigate, onBack }: Props) {
               </div>
               <div className="flex justify-between items-center pt-3 border-t border-gray-200">
                 <span className="font-display font-800 text-gray-900">Total paid</span>
-                <span className="font-display font-800 text-2xl text-gray-900">₹998</span>
+                <span className="font-display font-800 text-2xl text-gray-900">₹{summary.total}</span>
               </div>
             </div>
 

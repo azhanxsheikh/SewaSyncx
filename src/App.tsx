@@ -25,6 +25,7 @@ import ScheduledBooking from './screens/ScheduledBooking';
 import BookingHistory from './screens/BookingHistory';
 import Profile from './screens/Profile';
 import Notifications from './screens/Notifications';
+import AdminDashboard from './components/admin/AdminDashboard';
 import { DispatchProvider } from './context/DispatchContext';
 import SOSRouteErrorBoundary from './components/SOSRouteErrorBoundary';
 
@@ -214,19 +215,24 @@ export default function App() {
     bookings: <BookingHistory navigate={navigate} />,
     profile: <Profile navigate={navigate} />,
     notifications: <Notifications navigate={navigate} onBack={() => navigate(prevScreen)} />,
+    admin: <AdminDashboard navigate={navigate} onBack={() => navigate('profile')} />,
   };
 
   return (
     <DispatchProvider>
     <SOSRouteErrorBoundary>
-    <div className="bg-gray-100 min-h-screen">
-      {/* Mobile frame wrapper for desktop */}
-      <div className="max-w-md mx-auto bg-white min-h-screen relative shadow-2xl shadow-gray-400/20">
-        <div key={screen} className="fade-in">
-          {screenMap[screen] || <Home navigate={navigate} />}
+    {screen === 'admin' ? (
+      screenMap.admin
+    ) : (
+      <div className="bg-gray-100 min-h-screen">
+        {/* Mobile frame wrapper for desktop */}
+        <div className="max-w-md mx-auto bg-white min-h-screen relative shadow-2xl shadow-gray-400/20">
+          <div key={screen} className="fade-in">
+            {screenMap[screen] || <Home navigate={navigate} />}
+          </div>
         </div>
       </div>
-    </div>
+    )}
     </SOSRouteErrorBoundary>
     </DispatchProvider>
   );

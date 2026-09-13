@@ -35,4 +35,5 @@ export type Screen =
   | 'scheduled-confirmation'
   | 'bookings'
   | 'profile'
-  | 'notifications';
+  | 'notifications'
+  | 'admin';

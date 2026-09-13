@@ -19,6 +19,7 @@ import type {
 } from "../types/dispatch"
 import { forwardGeocode } from "../utils/geocoding"
 import { defaultConfirmedLocation } from "../fixtures/account.fixture"
+import { acceptRequestRpc } from "../lib/supabase"
 
 const CHANNEL_NAME = "sos-dispatch"
 const STORAGE_KEY = "sos-dispatch-job"
@@ -338,6 +339,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
         requestedForRelation: input.requestedForRelation,
         serviceLatitude: input.serviceLatitude,
         serviceLongitude: input.serviceLongitude,
+        searchRadiusKm: 10,
         estimatedTotal: 648,
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -431,7 +433,8 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
       jobHistory:
         job?.status === "completed" ||
         job?.status === "declined" ||
-        job?.status === "cancelled"
+        job?.status === "cancelled" ||
+        job?.status === "unfulfilled"
           ? [job]
           : [],
       technicianOnline,
@@ -446,21 +449,41 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
           executionStep,
           status: executionStep === "completed" ? "completed" : executionStep,
         }),
-      acceptJob: () =>
+      acceptJob: () => {
+        if (job?.id) {
+          void acceptRequestRpc(job.id, "t1").then((res) => {
+            if (res.error) {
+              console.warn("[dispatch] accept_request RPC error:", res.error)
+            } else {
+              console.log("[dispatch] accept_request RPC succeeded:", res.data)
+            }
+          })
+        }
         updateJob({
           status: "accepted",
           executionStep: "accepted",
           technicianId: "t1",
           technicianName: "Rahul Kumar",
-        }),
+        })
+      },
       declineJob: () => updateJob({ status: "declined" }),
-      acceptRequest: () =>
+      acceptRequest: () => {
+        if (job?.id) {
+          void acceptRequestRpc(job.id, "t1").then((res) => {
+            if (res.error) {
+              console.warn("[dispatch] accept_request RPC error:", res.error)
+            } else {
+              console.log("[dispatch] accept_request RPC succeeded:", res.data)
+            }
+          })
+        }
         updateJob({
           status: "accepted",
           executionStep: "accepted",
           technicianId: "t1",
           technicianName: "Rahul Kumar",
-        }),
+        })
+      },
       declineRequest: () => updateJob({ status: "declined" }),
       updateJobStatus: (status) =>
         updateJob({
@@ -510,6 +533,7 @@ function normalizeStatus(status: JobStatus): DispatchStatus {
     COMPLETED: "completed",
     CANCELLED: "cancelled",
     DECLINED: "declined",
+    UNFULFILLED: "unfulfilled",
   }
   return statusMap[status]
 }

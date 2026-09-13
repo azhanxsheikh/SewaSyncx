@@ -1,8 +1,15 @@
-export type DispatchStatus = "requested" | "searching" | "accepted" | "en-route" | "arrived" | "in-progress" | "completed" | "declined" | "cancelled"
+export type DispatchStatus = "requested" | "searching" | "accepted" | "en-route" | "arrived" | "in-progress" | "completed" | "declined" | "cancelled" | "unfulfilled"
 
-export type JobStatus = "PENDING_TECHNICIAN_ACCEPTANCE" | "ACCEPTED" | "ON_THE_WAY" | "ARRIVED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED" | "DECLINED"
+export type JobStatus = "PENDING_TECHNICIAN_ACCEPTANCE" | "ACCEPTED" | "ON_THE_WAY" | "ARRIVED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED" | "DECLINED" | "UNFULFILLED"
 
 export type ExecutionStep = "accepted" | "en-route" | "arrived" | "in-progress" | "completed"
+
+export type PriceAdjustmentReason =
+  | "standard_quote"
+  | "additional_parts_replaced"
+  | "unforeseen_complexity"
+  | "extended_labor_hours"
+  | "emergency_surcharge"
 
 export interface DispatchAttachment {
   id: string
@@ -24,10 +31,14 @@ export interface DispatchJob {
   requestedForRelation?: string
   serviceLatitude?: number
   serviceLongitude?: number
+  searchRadiusKm?: number
   location: string
   customerName: string
   customerPhone: string
   estimatedTotal: number
+  finalPrice?: number
+  priceAdjustmentReason?: PriceAdjustmentReason
+  priceAdjustmentNotes?: string
   createdAt: number
   updatedAt: number
   status: DispatchStatus

@@ -51,7 +51,9 @@ export default function TechnicianDirectionsMap({ serviceLatitude, serviceLongit
       .bindTooltip("Service address", { direction: "top" })
   }, [serviceLatitude, serviceLongitude, serviceCoordinates])
 
-  const openInMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(serviceLatitude !== undefined && serviceLongitude !== undefined ? `${serviceLatitude},${serviceLongitude}` : serviceAddress)}`
+  const openInMapsUrl = serviceLatitude !== undefined && serviceLongitude !== undefined
+    ? `https://www.google.com/maps/dir/?api=1&destination=${serviceLatitude},${serviceLongitude}`
+    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(serviceAddress)}`
 
   const requestRoute = () => {
     if (serviceLatitude === undefined || serviceLongitude === undefined) {

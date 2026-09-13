@@ -5,6 +5,7 @@ import {
   scheduledCategories,
   scheduledOfferings,
   serviceCategories,
+  symptomTags,
 } from '../fixtures/services.fixture';
 import type {
   DiagnosticQuestion,
@@ -25,20 +26,11 @@ import type {
  * rather than making each of these hooks async.
  */
 
-export function useServiceCategories(): ServiceCategory[] {
-  return serviceCategories;
-}
-
-export function useServiceCategory(categoryId: string): ServiceCategory {
-  return useMemo(
-    () => serviceCategories.find((category) => category.id === categoryId) || serviceCategories[0],
-    [categoryId],
-  );
-}
-
-export function useScheduledCategories(): ScheduledCategory[] {
-  return scheduledCategories;
-}
+export {
+  useScheduledCategories,
+  useServiceCategories,
+  useServiceCategory,
+} from './useServiceCategories';
 
 export function useScheduledOfferings(categoryId: string): ServiceOffering[] {
   return useMemo(
@@ -57,3 +49,8 @@ export function useDiagnosticQuestions(categoryId: string): DiagnosticQuestion[]
     [categoryId],
   );
 }
+
+export function useSymptomTags(): string[] {
+  return symptomTags;
+}
+

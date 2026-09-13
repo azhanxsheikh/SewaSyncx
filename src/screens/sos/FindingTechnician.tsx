@@ -2,21 +2,26 @@ import { useEffect, useState } from "react"
 import type { Screen } from "../../types/navigation"
 import MapView from "../../components/MapView"
 import { useDispatch } from "../../context/DispatchContext"
+import { useMatchingSteps } from "../../hooks/useMatchingSteps"
 
 interface Props {
   navigate: (s: Screen) => void
 }
 
 export default function FindingTechnician({ navigate }: Props) {
-  const { job, setStatus } = useDispatch()
+  const { job, setStatus, updateJob } = useDispatch()
   const activeRequest = job
+  const [radius, setRadius] = useState(() => job?.searchRadiusKm || 10)
+  const [countdown, setCountdown] = useState(30)
   const [elapsed, setElapsed] = useState(0)
   const [techProgress, setTechProgress] = useState(0)
+  const matchingSteps = useMatchingSteps(elapsed, radius)
 
   useEffect(() => {
     console.log("[client] finding technician screen", {
       requestId: job?.id,
       status: job?.status,
+      radius,
     })
     if (job?.status === "requested") setStatus("searching")
     const interval = setInterval(() => {
@@ -25,6 +30,34 @@ export default function FindingTechnician({ navigate }: Props) {
     }, 400)
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    if (job?.searchRadiusKm && job.searchRadiusKm !== radius) {
+      setRadius(job.searchRadiusKm)
+    }
+  }, [job?.searchRadiusKm, radius])
+
+  useEffect(() => {
+    if (job?.status !== "searching" && job?.status !== "requested") return
+    const chronoTimer = setInterval(() => {
+      setCountdown((prevCount) => {
+        if (prevCount > 1) return prevCount - 1
+        setRadius((currentRadius) => {
+          if (currentRadius < 30) {
+            const nextRadius = currentRadius + 5
+            updateJob({ searchRadiusKm: nextRadius })
+            return nextRadius
+          } else {
+            setStatus("unfulfilled")
+            updateJob({ status: "unfulfilled" })
+            return currentRadius
+          }
+        })
+        return 30
+      })
+    }, 1000)
+    return () => clearInterval(chronoTimer)
+  }, [job?.status, setStatus, updateJob])
 
   useEffect(() => {
     if (activeRequest)
@@ -71,10 +104,17 @@ export default function FindingTechnician({ navigate }: Props) {
                 SOS HomeFix
               </span>
             </div>
-            <span className="text-xs text-red-500 font-600 bg-red-50 px-2 py-1 rounded-full flex items-center gap-1">
-              <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-              Emergency Active
-            </span>
+            {job?.status === "unfulfilled" ? (
+              <span className="text-xs text-red-500 font-600 bg-red-50 px-2 py-1 rounded-full flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                Unfulfilled
+              </span>
+            ) : (
+              <span className="text-xs text-red-500 font-600 bg-red-50 px-2 py-1 rounded-full flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+                Emergency Active
+              </span>
+            )}
           </div>
         </div>
 
@@ -86,35 +126,23 @@ export default function FindingTechnician({ navigate }: Props) {
             <div className="max-w-md mx-auto">
               <div className="text-center mb-5">
                 <h2 className="font-display font-800 text-xl text-gray-900">
-                  {job?.requesterName && job.requesterName !== job.customerName
+                  {job?.status === "unfulfilled"
+                    ? "Please try again later"
+                    : job?.requesterName && job.requesterName !== job.customerName
                     ? `Finding a technician near ${job.customerName}'s location`
                     : "Finding your technician"}
-                  {".".repeat(dots + 1)}
+                  {job?.status === "unfulfilled" ? "" : ".".repeat(dots + 1)}
                 </h2>
                 <p className="text-gray-500 text-sm mt-1">
-                  Matching based on distance, skill, availability & rating
+                  {job?.status === "unfulfilled"
+                    ? "We could not find an available technician within 30 km. Please try again later."
+                    : `Matching within ${radius} km based on distance, skill, availability & rating`}
                 </p>
               </div>
 
               {/* Animated matching cards */}
               <div className="space-y-2 mb-5">
-                {[
-                  {
-                    icon: "📍",
-                    label: "Locating nearby technicians",
-                    done: elapsed > 1,
-                  },
-                  {
-                    icon: "⭐",
-                    label: "Verifying credentials & ratings",
-                    done: elapsed > 3,
-                  },
-                  {
-                    icon: "⚡",
-                    label: "Sending emergency dispatch request",
-                    done: elapsed > 5,
-                  },
-                ].map((step, i) => (
+                {matchingSteps.map((step, i) => (
                   <div
                     key={i}
                     className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
@@ -153,14 +181,28 @@ export default function FindingTechnician({ navigate }: Props) {
               <div className="bg-blue-50 rounded-xl p-3 text-center">
                 <p className="text-blue-700 text-sm font-600">
                   ⏱{" "}
-                  {job?.status === "accepted"
-                    ? "Technician accepted your request"
-                    : "Usually less than 60 seconds"}
+                  {job?.status === "unfulfilled"
+                    ? "Dispatch timeout · Try again later"
+                    : job?.status === "accepted"
+                      ? "Technician accepted your request"
+                      : `Searching within ${radius} km · Expanding in ${countdown}s`}
                 </p>
                 <p className="text-blue-500 text-xs mt-0.5">
-                  3 technicians found in your area
+                  {job?.status === "unfulfilled"
+                    ? "Max search radius 30 km reached without acceptance"
+                    : `Search radius: ${radius} km (expands +5 km up to 30 km)`}
                 </p>
               </div>
+
+              {job?.status === "unfulfilled" && (
+                <button
+                  type="button"
+                  onClick={() => navigate("home")}
+                  className="w-full mt-4 py-3.5 rounded-xl font-display font-700 text-sm bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98] transition-all"
+                >
+                  Return to Home
+                </button>
+              )}
             </div>
           </div>
         </div>

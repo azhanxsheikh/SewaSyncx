@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Screen } from '../../types/navigation';
 import { usePrimaryTechnician } from '../../hooks/useTechnicians';
-import { ratingLabels, reviewTags as tags, tipOptions } from '../../fixtures/billing.fixture';
+import { useReviewOptions } from '../../hooks/useBilling';
 
 interface Props {
   navigate: (s: Screen) => void;
@@ -9,6 +9,7 @@ interface Props {
 
 export default function Rating({ navigate }: Props) {
   const tech = usePrimaryTechnician();
+  const { ratingLabels, reviewTags: tags, tipOptions } = useReviewOptions();
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);

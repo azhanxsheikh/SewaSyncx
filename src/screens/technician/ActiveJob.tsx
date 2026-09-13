@@ -1,14 +1,22 @@
+import { useState } from "react"
 import { useDispatch } from "../../context/DispatchContext"
-import type { ExecutionStep, JobStatus } from "../../types/dispatch"
+import type { ExecutionStep, JobStatus, PriceAdjustmentReason } from "../../types/dispatch"
 import { executionSteps as steps } from "../../fixtures/requests.fixture"
 import TechnicianDirectionsMap from "../../components/TechnicianDirectionsMap"
-
+import { advanceRequestStatusRpc } from "../../lib/supabase"
 
 export default function ActiveJob() {
-  const { job, updateJobStatus } = useDispatch()
+  const { job, updateJobStatus, updateJob } = useDispatch()
+  const [showCompletionModal, setShowCompletionModal] = useState(false)
+  const [finalPriceInput, setFinalPriceInput] = useState("")
+  const [adjustmentReason, setAdjustmentReason] = useState<PriceAdjustmentReason>("standard_quote")
+  const [adjustmentNotes, setAdjustmentNotes] = useState("")
+  const [confirmedVariance, setConfirmedVariance] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   if (
     !job ||
-    !["accepted", "en-route", "arrived", "in-progress"].includes(job.status)
+    !["accepted", "en-route", "arrived", "in-progress", "completed"].includes(job.status)
   )
     return (
       <div className="rounded-2xl border border-slate-800 bg-slate-900 p-12 text-center text-slate-400">
@@ -23,6 +31,55 @@ export default function ActiveJob() {
     arrived: "ARRIVED",
     "in-progress": "IN_PROGRESS",
     completed: "COMPLETED",
+  }
+
+  const handleOpenCompletionModal = () => {
+    setFinalPriceInput(String(job.finalPrice ?? job.estimatedTotal ?? 998))
+    setAdjustmentReason(job.priceAdjustmentReason ?? "standard_quote")
+    setAdjustmentNotes(job.priceAdjustmentNotes ?? "")
+    setConfirmedVariance(false)
+    setShowCompletionModal(true)
+  }
+
+  const parsedPrice = Number(finalPriceInput)
+  const isValidPrice = !isNaN(parsedPrice) && parsedPrice >= 0 && finalPriceInput.trim() !== ""
+  const baseEstimate = job.estimatedTotal ?? 0
+  const delta = isValidPrice ? parsedPrice - baseEstimate : 0
+
+  const handleCompleteJob = async () => {
+    if (!isValidPrice) return
+    if (delta !== 0 && !confirmedVariance) return
+
+    setIsSubmitting(true)
+    try {
+      if (job.id) {
+        const res = await advanceRequestStatusRpc(
+          job.id,
+          "completed",
+          parsedPrice,
+          adjustmentReason,
+          adjustmentNotes || undefined,
+        )
+        if (res.error) {
+          console.warn("[technician] advance_request_status RPC error:", res.error)
+        } else {
+          console.log("[technician] advance_request_status RPC success:", res.data)
+        }
+      }
+      updateJob({
+        finalPrice: parsedPrice,
+        priceAdjustmentReason: adjustmentReason,
+        priceAdjustmentNotes: adjustmentNotes || undefined,
+        status: "completed",
+        executionStep: "completed",
+      })
+      updateJobStatus("COMPLETED")
+      setShowCompletionModal(false)
+    } catch (err) {
+      console.error("[technician] completion error:", err)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -100,13 +157,21 @@ export default function ActiveJob() {
             ))}
           </div>
           <button
-            onClick={() => updateJobStatus(statusForStep[next.id])}
-            disabled={current >= steps.length - 1}
+            onClick={() => {
+              if (next.id === "completed" || current >= steps.length - 1) {
+                handleOpenCompletionModal()
+              } else {
+                updateJobStatus(statusForStep[next.id])
+              }
+            }}
+            disabled={current >= steps.length - 1 && job.status === "completed"}
             className="w-full rounded-xl bg-emerald-500 py-3 font-700 text-white disabled:cursor-not-allowed disabled:bg-slate-700"
           >
-            {current >= steps.length - 1
+            {current >= steps.length - 1 && job.status === "completed"
               ? "Job complete"
-              : `Mark as ${next.label}`}
+              : next.id === "completed"
+                ? "Complete & Settle Job"
+                : `Mark as ${next.label}`}
           </button>
         </div>
         <aside className="space-y-4">
@@ -120,15 +185,177 @@ export default function ActiveJob() {
             >
               Call customer
             </a>
+            <a
+              href={`https://wa.me/${job.customerPhone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent("Hello, I am your SewaSync technician for job #" + job.id)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 block rounded-lg bg-slate-800 py-2 text-center text-sm font-600"
+            >
+              WhatsApp customer
+            </a>
+            <a
+              href={
+                job.serviceLatitude !== undefined && job.serviceLongitude !== undefined
+                  ? `https://www.google.com/maps/dir/?api=1&destination=${job.serviceLatitude},${job.serviceLongitude}`
+                  : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.location)}`
+              }
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 block rounded-lg bg-slate-800 py-2 text-center text-sm font-600"
+            >
+              Navigate to client
+            </a>
           </div>
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-            <p className="text-xs text-slate-500">Job estimate</p>
-            <p className="mt-2 font-display text-2xl font-800">
-              ₹{job.estimatedTotal}
+            <p className="text-xs text-slate-500">
+              {job.finalPrice ? "Final settled amount" : "Job estimate"}
             </p>
+            <p className="mt-2 font-display text-2xl font-800">
+              ₹{job.finalPrice ?? job.estimatedTotal}
+            </p>
+            {job.finalPrice !== undefined && job.finalPrice !== job.estimatedTotal && (
+              <p className="mt-1 text-xs text-slate-400">
+                Adjusted ({job.priceAdjustmentReason?.replace(/_/g, " ")})
+              </p>
+            )}
           </div>
         </aside>
       </div>
+
+      {showCompletionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-slate-500">Service settlement</p>
+                <h2 className="font-display text-lg font-800 text-white">
+                  Job Completion & Settlement
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCompletionModal(false)}
+                className="text-slate-400 text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-sm">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">
+                  Base estimate
+                </label>
+                <div className="rounded-xl border border-slate-800 bg-slate-800 px-4 py-2.5 font-700 text-white">
+                  ₹{job.estimatedTotal}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">
+                  Final settled price (₹ INR)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={finalPriceInput}
+                  onChange={(e) => setFinalPriceInput(e.target.value)}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-white focus:outline-none"
+                  placeholder="e.g. 998"
+                />
+              </div>
+
+              {delta !== 0 && (
+                <div className="rounded-xl border border-slate-800 bg-slate-800 p-3 space-y-1">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-slate-400">Estimate variance</span>
+                    <span
+                      className={`text-xs font-700 ${
+                        delta > 0 ? "text-amber-400" : "text-emerald-300"
+                      }`}
+                    >
+                      {delta > 0 ? `+₹${delta} above estimate` : `-₹${Math.abs(delta)} below estimate`}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Price differs from estimate. Client agreement confirmation is required.
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">
+                  Price adjustment reason
+                </label>
+                <select
+                  value={adjustmentReason}
+                  onChange={(e) =>
+                    setAdjustmentReason(e.target.value as PriceAdjustmentReason)
+                  }
+                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-white focus:outline-none"
+                >
+                  <option value="standard_quote">Standard quote (No change)</option>
+                  <option value="additional_parts_replaced">
+                    Additional parts replaced
+                  </option>
+                  <option value="unforeseen_complexity">
+                    Unforeseen complexity
+                  </option>
+                  <option value="extended_labor_hours">
+                    Extended labor hours
+                  </option>
+                  <option value="emergency_surcharge">
+                    Emergency surcharge
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">
+                  Technician notes / rationale (optional)
+                </label>
+                <input
+                  type="text"
+                  value={adjustmentNotes}
+                  onChange={(e) => setAdjustmentNotes(e.target.value)}
+                  placeholder="e.g. Replaced faulty MCB with client approval"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-white focus:outline-none"
+                />
+              </div>
+
+              {delta !== 0 && (
+                <label className="flex items-start gap-2 pt-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={confirmedVariance}
+                    onChange={(e) => setConfirmedVariance(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <span className="text-xs text-slate-300">
+                    I confirm the client has approved this price variance.
+                  </span>
+                </label>
+              )}
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={handleCompleteJob}
+                disabled={
+                  isSubmitting ||
+                  !isValidPrice ||
+                  (delta !== 0 && !confirmedVariance)
+                }
+                className="w-full rounded-xl bg-emerald-500 py-3 font-700 text-white disabled:cursor-not-allowed disabled:bg-slate-700"
+              >
+                {isSubmitting ? "Submitting settlement..." : "Confirm & Settle Job"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -3,6 +3,11 @@ import type {
   InvoiceLineItem,
   PaymentMethodOption,
 } from '../types/domain';
+import {
+  mappedAdditionalWorkRequest,
+  mappedInvoiceLineItems,
+  mappedInvoiceSummary,
+} from '../mocks/fixtures';
 
 /** Maps to the `payment_method` enum. */
 export const paymentMethods: PaymentMethodOption[] = [
@@ -15,42 +20,14 @@ export const paymentMethods: PaymentMethodOption[] = [
 /** UPI app shortcuts rendered under the UPI ID field. */
 export const upiApps: string[] = ['GPay', 'PhonePe', 'Paytm', 'BHIM'];
 
-/** Maps to `invoice_line_items`. */
-export const invoiceLineItems: InvoiceLineItem[] = [
-  { desc: 'Electrical repair service (1 hr 12 min)', amount: 499 },
-  { desc: 'Emergency dispatch fee', amount: 149 },
-  { desc: 'MCB replacement (×2) — parts', amount: 240 },
-  { desc: 'MCB replacement — labour', amount: 110 },
-];
+/** Maps to `invoice_line_items`. Derived from canonical DB fixtures. */
+export const invoiceLineItems: InvoiceLineItem[] = mappedInvoiceLineItems;
 
-/** Invoice header metadata rendered on the digital invoice. */
-export const invoiceSummary = {
-  invoiceNumber: '#INV-2026-09-2094',
-  date: 'Sep 5, 2026',
-  jobId: '#SH-2094',
-  timeRange: '2:42 PM – 3:54 PM',
-  billedToName: 'Abdullah Khan',
-  billedToAddressLine1: 'B-204, Gaur City 2',
-  billedToAddressLine2: 'Greater Noida West',
-  subtotal: 998,
-  gstLabel: 'GST (0%)',
-  gstAmount: 0,
-  total: 998,
-  paidVia: 'Paid via UPI · Sep 5, 2026 · 4:01 PM',
-  supportLine: 'support@soshomefix.in · 1800-SOS-HOME',
-};
+/** Invoice header metadata rendered on the digital invoice. Derived from canonical DB fixtures. */
+export const invoiceSummary = mappedInvoiceSummary;
 
-/** Maps to `request_cost_additions` — the approval-gated variance record. */
-export const additionalWorkRequest: AdditionalWorkRequest = {
-  reason:
-    'The main switchboard has a faulty MCB (Miniature Circuit Breaker) that needs replacement. This part was not visible during initial diagnosis and must be replaced to safely restore power.',
-  tags: ['MCB Replacement', 'Safety Issue', 'Electrical Hazard'],
-  originalEstimate: 648,
-  addedLabel: 'MCB replacement (×2)',
-  addedSublabel: 'Parts + installation',
-  addedAmount: 350,
-  newTotal: 998,
-};
+/** Maps to `request_cost_additions` — the approval-gated variance record. Derived from canonical DB fixtures. */
+export const additionalWorkRequest: AdditionalWorkRequest = mappedAdditionalWorkRequest;
 
 /** Post-service review attribute tags. Maps to `reviews.tags`. */
 export const reviewTags: string[] = [

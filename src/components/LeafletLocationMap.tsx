@@ -32,7 +32,9 @@ export default function LeafletLocationMap({ onLocationChange, initialAddress, a
     const marker = markerRef.current;
     if (!coordinates || !map || !marker) return;
     const point: L.LatLngExpression = [coordinates.latitude, coordinates.longitude];
-    map.setView(point, 16);
+    if (!showRoute) {
+      map.setView(point, 16);
+    }
     marker.setLatLng(point);
     accuracyCircleRef.current?.remove();
     accuracyCircleRef.current = L.circle(point, {
@@ -42,12 +44,16 @@ export default function LeafletLocationMap({ onLocationChange, initialAddress, a
       fillOpacity: 0.12,
       weight: 1,
     }).addTo(map);
-  }, [activeCoordinates?.accuracy, activeCoordinates?.latitude, activeCoordinates?.longitude]);
+  }, [activeCoordinates?.accuracy, activeCoordinates?.latitude, activeCoordinates?.longitude, showRoute]);
 
   useEffect(() => {
     if (!mapElement.current || mapRef.current) return;
 
-    const map = L.map(mapElement.current, { zoomControl: false }).setView(DEFAULT_LOCATION, 14);
+    const initialPoint: L.LatLngExpression = activeCoordinates
+      ? [activeCoordinates.latitude, activeCoordinates.longitude]
+      : DEFAULT_LOCATION;
+
+    const map = L.map(mapElement.current, { zoomControl: false }).setView(initialPoint, 14);
     L.control.zoom({ position: 'bottomright' }).addTo(map);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap contributors',
@@ -60,7 +66,7 @@ export default function LeafletLocationMap({ onLocationChange, initialAddress, a
       iconSize: [28, 28],
       iconAnchor: [14, 28],
     });
-    const marker = L.marker(DEFAULT_LOCATION, { draggable: true, icon: markerIcon }).addTo(map);
+    const marker = L.marker(initialPoint, { draggable: true, icon: markerIcon }).addTo(map);
     marker.bindTooltip('Drag to set your service location', { direction: 'top', offset: [0, -24] });
     marker.on('dragend', () => {
       const position = marker.getLatLng();
@@ -70,7 +76,18 @@ export default function LeafletLocationMap({ onLocationChange, initialAddress, a
       });
     });
     if (showRoute) {
-      L.polyline([DEFAULT_LOCATION, [28.61, 77.45]], { color: '#2563eb', dashArray: '8 6', weight: 4 }).addTo(map);
+      const techPoint: L.LatLngExpression = [28.61, 77.45];
+      L.polyline([initialPoint, techPoint], { color: '#2563eb', dashArray: '8 6', weight: 4 }).addTo(map);
+      const techMarker = L.marker(techPoint, {
+        icon: L.divIcon({
+          className: 'technician-directions-marker',
+          html: '<span style="background:#2563eb"></span>',
+          iconSize: [24, 24],
+          iconAnchor: [12, 12],
+        }),
+      }).addTo(map);
+      techMarker.bindTooltip('En-route technician (ETA: 12-17 min)', { direction: 'top' });
+      map.fitBounds(L.latLngBounds([initialPoint, techPoint]), { padding: [40, 40] });
     }
 
     mapRef.current = map;

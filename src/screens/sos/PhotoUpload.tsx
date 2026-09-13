@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Screen } from '../../types/navigation';
 import Header, { SOSProgress } from '../../components/Header';
 import { resizeFileToBase64, useDispatch } from '../../context/DispatchContext';
-import { symptomTags as symptoms } from '../../fixtures/services.fixture';
+import { useSymptomTags } from '../../hooks/useServiceCatalog';
 import type { DispatchAttachment } from '../../types/dispatch';
 
 interface Props {
@@ -11,6 +11,7 @@ interface Props {
 }
 
 export default function PhotoUpload({ navigate, onBack }: Props) {
+  const symptoms = useSymptomTags();
   const { updateSosDraft } = useDispatch();
   const fileInput = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState({ tags: [] as string[], description: '', uploaded: false, uploading: false, error: '', files: [] as File[], attachments: [] as DispatchAttachment[] });

@@ -15,24 +15,7 @@ export function useTechnicians(): Technician[] {
   return technicians;
 }
 
-/**
- * Resolves a technician by id.
- *
- * Returns `undefined` for an unknown id — callers already render a
- * "finding your technician" fallback for that case, so the behaviour is
- * preserved rather than substituting a default profile.
- */
-export function useTechnicianProfile(technicianId?: string): Technician | undefined {
-  return useMemo(
-    () => (technicianId ? technicians.find((technician) => technician.id === technicianId) : undefined),
-    [technicianId],
-  );
-}
-
-/** The primary demo technician, used by screens that predate assignment wiring. */
-export function usePrimaryTechnician(): Technician {
-  return technicians[0];
-}
+export { usePrimaryTechnician, useTechnicianProfile } from './useTechnicianProfile';
 
 export function useTechnicianJobHistory(): TechnicianJobRecord[] {
   return technicianJobHistory;
