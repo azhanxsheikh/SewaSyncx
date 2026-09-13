@@ -39,45 +39,45 @@ export default function ActiveJob({ onOpenAlerts }: ActiveJobProps) {
     const settledAmount = completedJob.finalPrice ?? completedJob.estimatedTotal
     return (
       <div className="mx-auto max-w-xl py-6 px-4">
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-8 sm:p-12 text-center shadow-xl backdrop-blur-sm">
+        <div className="rounded-3xl border border-slate-200 bg-white p-8 sm:p-12 text-center shadow-xl">
           <div className="relative mx-auto mb-6 flex h-20 w-20 items-center justify-center">
-            <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-500/10">
+            <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 border border-emerald-300 text-emerald-600 shadow-lg shadow-emerald-500/10">
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
               </svg>
             </span>
           </div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs font-semibold mb-3">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-700 text-xs font-semibold mb-3">
+            <span className="h-2 w-2 rounded-full bg-emerald-500" />
             <span>Payment settled · {formatJobId(completedJob.id)}</span>
           </div>
-          <h2 className="font-display text-2xl font-800 text-white tracking-tight">
+          <h2 className="font-display text-2xl font-800 text-slate-900 tracking-tight">
             Job Complete
           </h2>
-          <p className="mt-2 text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+          <p className="mt-2 text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
             <span className="capitalize">{completedJob.service.replace("-", " ")}</span> emergency for {completedJob.customerName}
           </p>
-          <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-5 text-left">
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-left">
             <p className="text-xs text-slate-500">Final settled amount</p>
-            <p className="mt-2 font-display text-2xl font-800">₹{settledAmount}</p>
+            <p className="mt-2 font-display text-2xl font-800 text-slate-900">₹{settledAmount}</p>
             {settledAmount !== completedJob.estimatedTotal && (
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs text-slate-500">
                 Estimate ₹{completedJob.estimatedTotal}
                 {completedJob.priceAdjustmentReason ? ` · Adjusted (${completedJob.priceAdjustmentReason.replace(/_/g, " ")})` : ""}
               </p>
             )}
           </div>
           {completedJob.priceAdjustmentNotes && (
-            <div className="mt-3 mb-4 rounded-2xl border border-amber-500/30 bg-amber-950/40 p-4 text-left shadow-sm">
+            <div className="mt-3 mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left shadow-sm">
               <p className="text-xs text-slate-500">Adjustment notes</p>
-              <p className="mt-1.5 text-sm text-amber-100 font-medium leading-relaxed">{completedJob.priceAdjustmentNotes}</p>
+              <p className="mt-1.5 text-sm text-amber-900 font-medium leading-relaxed">{completedJob.priceAdjustmentNotes}</p>
             </div>
           )}
           <div className="mt-6">
             <button
               type="button"
               onClick={dismissCompletedJob}
-              className="w-full rounded-xl bg-emerald-500 py-3 font-700 text-white"
+              className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 py-3 font-700 text-white shadow-md shadow-emerald-600/20 transition-colors"
             >
               Close & Return to Standby
             </button>
@@ -87,32 +87,32 @@ export default function ActiveJob({ onOpenAlerts }: ActiveJobProps) {
     )
   }
 
-  if (!job ||!["accepted", "en-route", "en_route", "arrived", "in-progress", "in_progress"].includes(job.status)) {
+  if (!job || !["accepted", "en-route", "en_route", "arrived", "in-progress", "in_progress"].includes(job.status)) {
     return (
       <div className="mx-auto max-w-xl py-6 px-4">
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-8 sm:p-12 text-center shadow-xl backdrop-blur-sm">
+        <div className="rounded-3xl border border-slate-200 bg-white p-8 sm:p-12 text-center shadow-xl">
           <div className="relative mx-auto mb-6 flex h-20 w-20 items-center justify-center">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400/20" />
-            <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-500/10">
+            <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 border border-emerald-300 text-emerald-600 shadow-lg shadow-emerald-500/10">
               <svg className="w-8 h-8 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 2v2m0 16v2m10-10h-2M4 12H2m15.07-7.07l-1.41 1.41M6.34 17.66l-1.41 1.41m12.14 0l-1.41-1.41M6.34 6.34L4.93 4.93" />
                 <circle cx="12" cy="12" r="3" strokeWidth={1.75} />
               </svg>
             </span>
           </div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs font-semibold mb-3">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-700 text-xs font-semibold mb-3">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
             <span>SewaSync Worker Cooperative</span>
           </div>
           {notice && (
-            <div className="mt-3 mb-4 rounded-2xl border border-amber-500/30 bg-amber-950/40 p-4 text-left shadow-sm">
-              <p className="mt-1.5 text-sm text-amber-100 font-medium leading-relaxed">{notice}</p>
+            <div className="mt-3 mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left shadow-sm">
+              <p className="mt-1.5 text-sm text-amber-900 font-medium leading-relaxed">{notice}</p>
             </div>
           )}
-          <h2 className="font-display text-2xl font-800 text-white tracking-tight">
+          <h2 className="font-display text-2xl font-800 text-slate-900 tracking-tight">
             Ready for Dispatch
           </h2>
-          <p className="mt-2 text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+          <p className="mt-2 text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
             You are currently online. New emergency alerts in your operating zone will appear in Incoming Alerts.
           </p>
           {onOpenAlerts && (
@@ -155,31 +155,31 @@ export default function ActiveJob({ onOpenAlerts }: ActiveJobProps) {
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
         <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold text-emerald-400">Active job · {formattedJobId}</p>
-          <span className="text-slate-600">·</span>
-          <span className={`text-xs px-2 py-0.5 rounded font-bold ${destination.isFamily ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'}`}>
+          <p className="text-sm font-semibold text-emerald-600">Active job · {formattedJobId}</p>
+          <span className="text-slate-400">·</span>
+          <span className={`text-xs px-2 py-0.5 rounded font-bold ${destination.isFamily ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-blue-50 text-blue-600 border border-blue-200'}`}>
             {destination.badge}
           </span>
         </div>
-        <h1 className="mt-1 font-display text-3xl font-800 capitalize">
+        <h1 className="mt-1 font-display text-3xl font-800 capitalize text-slate-900">
           {job.service.replace("-", " ")} emergency
         </h1>
-        <p className="mt-1 text-slate-300 font-medium">
+        <p className="mt-1 text-slate-700 font-medium">
           {destination.fullLabel}
         </p>
-        <p className="text-xs text-slate-400 mt-0.5">
+        <p className="text-xs text-slate-500 mt-0.5">
           Recipient: {job.customerName} ({job.customerPhone}){destination.isFamily && job.requesterName ? ` · Requested by ${job.requesterName}` : ""}
         </p>
         {job.landmarkAndInstructions && (
-          <div className="mt-3 mb-4 rounded-2xl border border-amber-500/30 bg-amber-950/40 p-4 text-left shadow-sm">
-            <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+          <div className="mt-3 mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left shadow-sm">
+            <div className="flex items-center gap-2 text-amber-800 font-bold text-xs uppercase tracking-wider">
               <span>🚩</span>
               <span>Landmark & Entry Instructions for Technician</span>
             </div>
-            <p className="mt-1.5 text-sm text-amber-100 font-medium leading-relaxed">
+            <p className="mt-1.5 text-sm text-amber-900 font-medium leading-relaxed">
               {job.landmarkAndInstructions}
             </p>
-            <p className="mt-1 text-[11px] text-amber-300/70">
+            <p className="mt-1 text-[11px] text-amber-700">
               💡 Show this at security gate / MyGate checkpoint for faster society entry
             </p>
           </div>
@@ -193,8 +193,8 @@ export default function ActiveJob({ onOpenAlerts }: ActiveJobProps) {
         />
 
         {(job.description || job.attachments?.length > 0) && (
-          <div className="mt-4 rounded-2xl border border-gray-100 bg-white p-4">
-            {job.description && <p className="text-sm text-gray-700">{job.description}</p>}
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            {job.description && <p className="text-sm text-slate-700">{job.description}</p>}
             {job.attachments?.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-3">
                 {job.attachments.map((file) => file.type === "video" ? (
@@ -210,8 +210,8 @@ export default function ActiveJob({ onOpenAlerts }: ActiveJobProps) {
         )}
       </div>
       <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-          <p className="mb-5 font-display text-lg font-800">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="mb-5 font-display text-lg font-800 text-slate-900">
             Execution console
           </p>
           <div className="space-y-1">
@@ -221,8 +221,8 @@ export default function ActiveJob({ onOpenAlerts }: ActiveJobProps) {
                   <div
                     className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-700 ${
                       index <= current
-                        ? "bg-emerald-500 text-white"
-                        : "bg-slate-800 text-slate-500"
+                        ? "bg-emerald-600 text-white"
+                        : "bg-slate-100 text-slate-400 border border-slate-200"
                     }`}
                   >
                     {index < current ? "✓" : index + 1}
@@ -230,7 +230,7 @@ export default function ActiveJob({ onOpenAlerts }: ActiveJobProps) {
                   {index < steps.length - 1 && (
                     <div
                       className={`h-10 w-0.5 ${
-                        index < current ? "bg-emerald-500" : "bg-slate-800"
+                        index < current ? "bg-emerald-500" : "bg-slate-200"
                       }`}
                     />
                   )}
@@ -239,10 +239,10 @@ export default function ActiveJob({ onOpenAlerts }: ActiveJobProps) {
                   <p
                     className={`font-700 ${
                       index === current
-                        ? "text-emerald-300"
+                        ? "text-emerald-700 font-bold"
                         : index < current
-                          ? "text-slate-200"
-                          : "text-slate-500"
+                          ? "text-slate-800"
+                          : "text-slate-400"
                     }`}
                   >
                     {step.label}
@@ -262,7 +262,7 @@ export default function ActiveJob({ onOpenAlerts }: ActiveJobProps) {
               if (transition) void advance(transition)
             }}
             disabled={mutating || (current >= steps.length - 1 && job.status === "completed")}
-            className="w-full rounded-xl bg-emerald-500 py-3 font-700 text-white disabled:cursor-not-allowed disabled:bg-slate-700"
+            className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 py-3 font-700 text-white shadow-md shadow-emerald-600/20 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 transition-colors"
           >
             {current >= steps.length - 1 && job.status === "completed"
               ? "Job complete"
@@ -275,19 +275,19 @@ export default function ActiveJob({ onOpenAlerts }: ActiveJobProps) {
                     : `Mark as ${next.label}`}
           </button>
           {(error || notice) && (
-            <div className="mt-3 rounded-xl border border-red-500/40 bg-red-950/50 p-4 text-sm text-red-200">
+            <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
               {error ?? notice}
             </div>
           )}
         </div>
         <aside className="space-y-4">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-xs text-slate-500">Customer contact</p>
-            <p className="mt-2 font-700">{job.customerName}</p>
-            <p className="mt-1 text-sm text-slate-400">{job.customerPhone}</p>
+            <p className="mt-2 font-700 text-slate-900">{job.customerName}</p>
+            <p className="mt-1 text-sm text-slate-500">{job.customerPhone}</p>
             <a
               href={`tel:${job.customerPhone}`}
-              className="mt-4 block rounded-lg bg-slate-800 py-2 text-center text-sm font-600"
+              className="mt-4 block rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 py-2 text-center text-sm font-600 transition-colors"
             >
               Call customer
             </a>
@@ -295,7 +295,7 @@ export default function ActiveJob({ onOpenAlerts }: ActiveJobProps) {
               href={`https://wa.me/${job.customerPhone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Hello, I am your SewaSync technician for ${formattedJobId}`)}`}
               target="_blank"
               rel="noreferrer"
-              className="mt-2 block rounded-lg bg-slate-800 py-2 text-center text-sm font-600"
+              className="mt-2 block rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200 py-2 text-center text-sm font-600 transition-colors"
             >
               WhatsApp customer
             </a>
@@ -312,15 +312,15 @@ export default function ActiveJob({ onOpenAlerts }: ActiveJobProps) {
               Navigate to client (Google Maps ↗)
             </a>
           </div>
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-xs text-slate-500">
               {job.finalPrice ? "Final settled amount" : "Job estimate"}
             </p>
-            <p className="mt-2 font-display text-2xl font-800">
+            <p className="mt-2 font-display text-2xl font-800 text-slate-900">
               ₹{job.finalPrice ?? job.estimatedTotal}
             </p>
             {job.finalPrice !== undefined && job.finalPrice !== job.estimatedTotal && (
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-xs text-slate-500">
                 Adjusted ({job.priceAdjustmentReason?.replace(/_/g, " ")})
               </p>
             )}

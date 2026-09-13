@@ -77,26 +77,26 @@ export default function JobInspectionDrawer({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative flex h-full w-full max-w-xl flex-col bg-slate-900 border-l border-slate-800 text-slate-100 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative flex h-full w-full max-w-xl flex-col bg-white border-l border-slate-200 text-slate-900 shadow-2xl">
         {/* Sticky Header with Countdown */}
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-slate-900/95 px-5 py-4 backdrop-blur-md">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur-md">
           <div className="flex items-center gap-3">
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/20 text-red-400 font-display font-800 text-sm">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-xl bg-red-400/20" />
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600 font-display font-800 text-sm">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-xl bg-red-200/50" />
               <span>SOS</span>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-red-400">
+                <span className="text-xs font-bold uppercase tracking-wider text-red-600">
                   {job.priority} Priority Dispatch
                 </span>
-                <span className="text-slate-600">·</span>
-                <span className="text-xs font-medium text-slate-400">
+                <span className="text-slate-400">·</span>
+                <span className="text-xs font-medium text-slate-500">
                   {secondsRemaining}s to respond
                 </span>
               </div>
-              <h2 className="font-display text-lg font-800 text-white capitalize leading-tight">
+              <h2 className="font-display text-lg font-800 text-slate-900 capitalize leading-tight">
                 {job.service.replace("-", " ")} Emergency
               </h2>
             </div>
@@ -104,7 +104,7 @@ export default function JobInspectionDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
           >
             ✕
           </button>
@@ -114,66 +114,66 @@ export default function JobInspectionDrawer({
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
           {/* Error Banner if RPC failed */}
           {acceptError && (
-            <div className="rounded-xl border border-red-500/40 bg-red-950/50 p-4 text-sm text-red-200">
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
               <p className="font-bold flex items-center gap-1.5">
                 <span>⚠️</span>
                 <span>Claim Error</span>
               </p>
-              <p className="mt-1 text-xs text-red-300/90">{acceptError}</p>
+              <p className="mt-1 text-xs text-red-600">{acceptError}</p>
             </div>
           )}
 
           {/* Destination & Beneficiary Distinction */}
-          <div className="rounded-2xl border border-slate-800 bg-slate-800/40 p-4">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex items-center justify-between">
               {destination.isFamily ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-bold">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 text-xs font-bold">
                   <span>🚨</span>
                   <span>{destination.badge}</span>
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-400 text-xs font-bold">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold">
                   <span>🏠</span>
                   <span>{destination.badge}</span>
                 </span>
               )}
-              <span className="font-display font-800 text-emerald-400 text-base">
+              <span className="font-display font-800 text-emerald-700 text-base">
                 ₹{job.estimatedTotal}
               </span>
             </div>
 
-            <h3 className="mt-2.5 font-display font-800 text-base sm:text-lg text-white">
+            <h3 className="mt-2.5 font-display font-800 text-base sm:text-lg text-slate-900">
               {destination.fullLabel}
             </h3>
 
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400">
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
               <span>
-                <strong className="text-slate-300">Recipient:</strong> {job.customerName}
+                <strong className="text-slate-800">Recipient:</strong> {job.customerName}
               </span>
               {destination.isFamily && job.requesterName && (
                 <span>
-                  <strong className="text-slate-300">Requested by:</strong> {job.requesterName}
+                  <strong className="text-slate-800">Requested by:</strong> {job.requesterName}
                 </span>
               )}
             </div>
           </div>
 
           {/* Client Access Notes / Landmark Banner */}
-          <div className="rounded-2xl border border-amber-500/30 bg-amber-950/30 p-4">
-            <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-center gap-2 text-amber-800 font-bold text-xs uppercase tracking-wider">
               <span>🚩</span>
               <span>Client Landmark & Access Instructions</span>
             </div>
-            <p className="mt-2 text-sm text-amber-100 font-medium leading-relaxed">
+            <p className="mt-2 text-sm text-amber-900 font-medium leading-relaxed">
               {job.landmarkAndInstructions || "No gate or landmark instructions specified by client."}
             </p>
-            <p className="mt-1.5 text-[11px] text-amber-300/70">
+            <p className="mt-1.5 text-[11px] text-amber-700">
               💡 Essential for fast security clearance at gated society entrances (MyGate/NoBrokerHood).
             </p>
           </div>
 
           {/* Static Context Map (Navigation Inactive in Pre-acceptance) */}
-          <div className="rounded-2xl overflow-hidden border border-slate-800 bg-slate-800/40">
+          <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-50">
             <TechnicianDirectionsMap
               serviceLatitude={job.serviceLatitude}
               serviceLongitude={job.serviceLongitude}
@@ -184,9 +184,9 @@ export default function JobInspectionDrawer({
           </div>
 
           {/* Client Media (Photos & Videos) */}
-          <div className="rounded-2xl border border-slate-800 bg-slate-800/40 p-4 space-y-3">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="font-display font-700 text-sm text-white">
+              <h4 className="font-display font-700 text-sm text-slate-900">
                 Client Site Media (Pre-Job)
               </h4>
               <span className="text-xs text-slate-500">
@@ -195,7 +195,7 @@ export default function JobInspectionDrawer({
             </div>
 
             {isLoadingMedia ? (
-              <div className="flex items-center justify-center py-8 text-xs text-slate-400 gap-2">
+              <div className="flex items-center justify-center py-8 text-xs text-slate-500 gap-2">
                 <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
                 <span>Checking pre-job media...</span>
               </div>
@@ -205,10 +205,10 @@ export default function JobInspectionDrawer({
                   <div
                     key={file.id}
                     onClick={() => setActiveMedia(file)}
-                    className="group relative aspect-square overflow-hidden rounded-xl border border-slate-700 bg-slate-800 cursor-pointer"
+                    className="group relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-white cursor-pointer shadow-sm"
                   >
                     {file.type === "video" ? (
-                      <div className="flex h-full w-full items-center justify-center bg-slate-950">
+                      <div className="flex h-full w-full items-center justify-center bg-slate-100">
                         <span className="text-2xl">▶️</span>
                       </div>
                     ) : (
@@ -225,9 +225,9 @@ export default function JobInspectionDrawer({
                 ))}
               </div>
             ) : (
-              <div className="rounded-xl border border-dashed border-slate-700/60 bg-slate-900/40 py-7 text-center">
+              <div className="rounded-xl border border-dashed border-slate-300 bg-white py-7 text-center">
                 <span className="text-2xl">📷</span>
-                <p className="mt-1 text-sm font-semibold text-slate-300">
+                <p className="mt-1 text-sm font-semibold text-slate-700">
                   No pre-job photo provided
                 </p>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -238,17 +238,17 @@ export default function JobInspectionDrawer({
           </div>
 
           {/* Diagnostic Answers & Symptoms */}
-          <div className="rounded-2xl border border-slate-800 bg-slate-800/40 p-4 space-y-3">
-            <h4 className="font-display font-700 text-sm text-white">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+            <h4 className="font-display font-700 text-sm text-slate-900">
               Diagnostic Answers & Symptoms
             </h4>
 
             {diagnosticAnswers.length > 0 ? (
-              <div className="divide-y divide-slate-800/60 rounded-xl border border-slate-700/60 bg-slate-900/60 px-3.5">
+              <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white px-3.5">
                 {diagnosticAnswers.map((item, idx) => (
                   <div key={idx} className="flex items-center justify-between py-2.5 text-sm">
-                    <span className="text-slate-300 font-medium">{item.question}</span>
-                    <span className="font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded text-xs">
+                    <span className="text-slate-700 font-medium">{item.question}</span>
+                    <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded text-xs">
                       {item.answer}
                     </span>
                   </div>
@@ -259,8 +259,8 @@ export default function JobInspectionDrawer({
             )}
 
             {job.description && (
-              <div className="mt-2 rounded-xl bg-slate-900/60 border border-slate-700/60 p-3 text-xs text-slate-300 leading-relaxed">
-                <span className="text-slate-400 font-semibold">Client note: </span>
+              <div className="mt-2 rounded-xl bg-white border border-slate-200 p-3 text-xs text-slate-700 leading-relaxed">
+                <span className="text-slate-500 font-semibold">Client note: </span>
                 {job.description}
               </div>
             )}
@@ -268,13 +268,13 @@ export default function JobInspectionDrawer({
         </div>
 
         {/* Sticky Action Controls Footer */}
-        <div className="sticky bottom-0 border-t border-slate-800 bg-slate-900/95 p-4 backdrop-blur-md">
+        <div className="sticky bottom-0 border-t border-slate-200 bg-white/95 p-4 backdrop-blur-md">
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={onDecline}
               disabled={isAccepting}
-              className="rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 py-3.5 font-bold text-slate-300 transition-colors disabled:opacity-50"
+              className="rounded-xl border border-slate-200 bg-slate-100 hover:bg-slate-200 py-3.5 font-bold text-slate-700 transition-colors disabled:opacity-50"
             >
               Decline
             </button>
@@ -282,7 +282,7 @@ export default function JobInspectionDrawer({
               type="button"
               onClick={handleAcceptJob}
               disabled={isAccepting}
-              className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] py-3.5 font-bold text-white shadow-lg shadow-emerald-600/30 transition-all disabled:cursor-not-allowed disabled:bg-slate-700 disabled:shadow-none"
+              className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] py-3.5 font-bold text-white shadow-lg shadow-emerald-600/20 transition-all disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
             >
               {isAccepting ? (
                 <>
