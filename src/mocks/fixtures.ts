@@ -1,3 +1,17 @@
+/**
+ * @deprecated As of src/context/DataProvider.tsx, this is no longer the
+ * primary data source for any screen — every hook that has a real
+ * Supabase query behind it (see src/hooks/) reads from DataProvider first
+ * and only falls back to the fixture data derived from this file when:
+ * (a) the initial fetch hasn't resolved yet, (b) the signed-in user
+ * genuinely has none of that data yet, or (c) no real query is possible at
+ * all for that shape (useTechnicians() — see its own doc comment for why).
+ *
+ * Not deleted, because those fallbacks are real and depended-on, not dead
+ * code — src/fixtures/*.fixture.ts still import from here for exactly
+ * those cases. Do not add new features against this file; wire a real
+ * query in DataProvider.tsx instead, the way the ones above already are.
+ */
 import type { Database } from '../types/database';
 import type {
   AdditionalWorkRequest,
