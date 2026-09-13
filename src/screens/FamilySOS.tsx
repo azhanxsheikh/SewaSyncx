@@ -88,9 +88,10 @@ export default function FamilySOS({
         .maybeSingle()
 
       if (userId && cat?.id) {
-        const basePrice = cat.sos_base_price ?? 499
-        const fee = cat.sos_emergency_fee ?? 149
-        await supabase.from("requests").insert({
+        // contact_name/contact_phone come from the family member row
+        // (snapshot_request_contact) and estimated_total from the catalogue
+        // (price_request_from_catalogue), both server-side.
+        const { error: insertError } = await supabase.from("requests").insert({
           client_id: userId,
           family_member_id: member.id || null,
           category_id: cat.id,
@@ -99,12 +100,13 @@ export default function FamilySOS({
           service_location: `POINT(${memberCoords.longitude} ${memberCoords.latitude})`,
           address_line: member.address,
           area: member.area,
-          contact_name: member.name,
-          contact_phone: member.phone || "+919811045678",
-          estimated_total: basePrice + fee,
+          estimated_total: (cat.sos_base_price ?? 0) + (cat.sos_emergency_fee ?? 0),
           symptoms: [`Emergency assistance requested for ${member.name} (${member.relation})`],
           search_radius_km: 10,
         })
+        if (insertError) console.error("[family-sos] request not persisted", insertError.message)
+      } else {
+        console.error("[family-sos] request not persisted: unknown service category", selectedService)
       }
     } catch {
       // Graceful fallback to local dispatch

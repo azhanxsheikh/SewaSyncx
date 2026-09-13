@@ -83,6 +83,18 @@ values ('5a5a5a5a-0000-4000-8000-000000000001', '11111111-1111-4111-8111-1111111
         'Flat 402, Tower B, Gaur City 2', 'Greater Noida West, UP 201009',
         st_point(77.4267, 28.6083, 4326)::geography, true);
 
+-- Family SOS beneficiaries. 20260913000011_seed_family_members.sql inserts the
+-- same rows but skips them on a fresh database (owner not created yet).
+insert into public.family_members (id, owner_id, name, relation, phone, emoji, address_line, area, location)
+values
+  ('f1111111-1111-4111-8111-111111111101', '11111111-1111-4111-8111-111111111111', 'Papa', 'Father',
+   '+919811045678', '👨', 'A-47, Sector 62, Noida', 'Noida, Uttar Pradesh', st_point(77.3649, 28.6280, 4326)::geography),
+  ('f1111111-1111-4111-8111-111111111102', '11111111-1111-4111-8111-111111111111', 'Mummy', 'Mother',
+   '+919811045679', '👩', 'A-47, Sector 62, Noida', 'Noida, Uttar Pradesh', st_point(77.3649, 28.6280, 4326)::geography),
+  ('f1111111-1111-4111-8111-111111111103', '11111111-1111-4111-8111-111111111111', 'Dadi', 'Grandmother',
+   '+919711023456', '👵', 'H.No. 12, Lal Kuan, Delhi', 'Old Delhi, Delhi', st_point(77.2285, 28.6496, 4326)::geography)
+on conflict (id) do nothing;
+
 
 -- -----------------------------------------------------------------------------
 -- Admin (platform_staff, super_admin). No phone: staff signups skip that

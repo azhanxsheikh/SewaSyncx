@@ -138,7 +138,8 @@ export function useTechnicianBroadcaster(options?: BroadcasterOptions): Broadcas
               location: `POINT(${coords.longitude} ${coords.latitude})`,
               heading: currentHeading ?? null,
               speed: currentSpeed ?? null,
-              request_id: job?.id ?? null,
+              // request_id is not client-writable (20260913000013): it is
+              // maintained by sync_technician_location_request on assignment.
               updated_at: new Date().toISOString(),
             })
             .eq('technician_id', userId);

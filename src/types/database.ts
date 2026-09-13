@@ -196,6 +196,54 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          created_at: string
+          icon: string | null
+          id: string
+          is_read: boolean
+          request_id: string | null
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_read?: boolean
+          request_id?: string | null
+          title: string
+          type: Database["public"]["Enums"]["notification_type"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          icon?: string | null
+          id?: string
+          is_read?: boolean
+          request_id?: string | null
+          title?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
@@ -1222,6 +1270,36 @@ export type Database = {
         }
         Returns: Database["public"]["Tables"]["technician_profiles"]["Row"]
       }
+      verify_technician: {
+        Args: {
+          p_background_checked?: boolean
+          p_identity_verified?: boolean
+          p_skill_verified?: boolean
+          p_technician_id: string
+        }
+        Returns: {
+          background_checked: boolean
+          created_at: string
+          experience_years: number | null
+          id: string
+          identity_verified: boolean
+          is_online: boolean
+          photo_url: string | null
+          rating: number
+          review_count: number
+          skill_verified: boolean
+          total_jobs: number
+          updated_at: string
+          vehicle_registration: string | null
+          vehicle_type: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "technician_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       actor_role: "client" | "technician" | "system" | "admin"
@@ -1247,6 +1325,13 @@ export type Database = {
       liability_party: "client" | "technician" | "platform" | "split"
       liability_tier: "tier_1" | "tier_2" | "tier_3"
       network_type: "wifi" | "cellular_4g" | "cellular_5g" | "unknown"
+      notification_type:
+        | "status_update"
+        | "eta_update"
+        | "arrival"
+        | "approval_request"
+        | "invoice_ready"
+        | "booking_confirmed"
       payment_method: "upi" | "card" | "netbanking" | "cash"
       payment_status: "pending" | "processing" | "succeeded" | "failed"
       price_adjustment_reason:
@@ -1430,6 +1515,14 @@ export const Constants = {
       liability_party: ["client", "technician", "platform", "split"],
       liability_tier: ["tier_1", "tier_2", "tier_3"],
       network_type: ["wifi", "cellular_4g", "cellular_5g", "unknown"],
+      notification_type: [
+        "status_update",
+        "eta_update",
+        "arrival",
+        "approval_request",
+        "invoice_ready",
+        "booking_confirmed",
+      ],
       payment_method: ["upi", "card", "netbanking", "cash"],
       payment_status: ["pending", "processing", "succeeded", "failed"],
       price_adjustment_reason: [

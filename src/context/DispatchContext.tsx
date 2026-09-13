@@ -115,6 +115,9 @@ interface DispatchContextValue {
   updateSosDraft: (
     patch: Partial<Pick<DispatchJob, "symptoms" | "description" | "attachments">>,
   ) => void
+  sosDraft: Pick<DispatchJob, "symptoms" | "description" | "attachments">
+  sosDraftFiles: File[]
+  setSosDraftFiles: (files: File[]) => void
 }
 
 const DispatchContext = createContext<DispatchContextValue | null>(null)
@@ -153,33 +156,6 @@ function publish(event: DispatchEvent) {
   }
 }
 
-export function resizeFileToBase64(file: File, maxSize = 640): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(reader.error)
-    reader.onload = () => {
-      if (!file.type.startsWith("image/")) {
-        resolve(String(reader.result))
-        return
-      }
-      const image = new Image()
-      image.onerror = () => reject(new Error("Unable to read image"))
-      image.onload = () => {
-        const scale = Math.min(1, maxSize / Math.max(image.width, image.height))
-        const canvas = document.createElement("canvas")
-        canvas.width = Math.max(1, Math.round(image.width * scale))
-        canvas.height = Math.max(1, Math.round(image.height * scale))
-        canvas
-          .getContext("2d")
-          ?.drawImage(image, 0, 0, canvas.width, canvas.height)
-        resolve(canvas.toDataURL("image/jpeg", 0.78))
-      }
-      image.src = String(reader.result)
-    }
-    reader.readAsDataURL(file)
-  })
-}
-
 export function DispatchProvider({ children }: { children: ReactNode }) {
   const [job, setJob] = useState<DispatchJob | null>(() => readStoredJob())
   const [sosDraft, setSosDraft] =
@@ -188,6 +164,10 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
       description: "",
       attachments: [],
     })
+  // Evidence picked during SOS intake, held in memory only (never serialised
+  // into the job mirror) until SOSConfirmation has a real request id to upload
+  // it under — see lib/sosMedia.ts.
+  const [sosDraftFiles, setSosDraftFiles] = useState<File[]>([])
   const [technicianOnline, setTechnicianOnline] = useState(true)
   const [confirmedLocation, setConfirmedLocation] = useState<ConfirmedLocation>(
     defaultConfirmedLocation,
@@ -506,8 +486,12 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
               attachments: [...current.attachments, ...attachments],
             })),
       updateSosDraft,
+      sosDraft,
+      sosDraftFiles,
+      setSosDraftFiles,
     }),
     [
+      sosDraftFiles,
       createJob,
       confirmedLocation,
       job,

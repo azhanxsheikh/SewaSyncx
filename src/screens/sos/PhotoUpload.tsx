@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Screen } from '../../types/navigation';
 import Header, { SOSProgress } from '../../components/Header';
-import { resizeFileToBase64, useDispatch } from '../../context/DispatchContext';
+import { useDispatch } from '../../context/DispatchContext';
 import { useSymptomTags } from '../../hooks/useServiceCatalog';
-import type { DispatchAttachment } from '../../types/dispatch';
 
 interface Props {
   navigate: (s: Screen) => void;
@@ -12,13 +11,14 @@ interface Props {
 
 export default function PhotoUpload({ navigate, onBack }: Props) {
   const symptoms = useSymptomTags();
-  const { updateSosDraft } = useDispatch();
+  const { updateSosDraft, setSosDraftFiles } = useDispatch();
   const fileInput = useRef<HTMLInputElement>(null);
-  const [form, setForm] = useState({ tags: [] as string[], description: '', uploaded: false, uploading: false, error: '', files: [] as File[], attachments: [] as DispatchAttachment[] });
+  const [form, setForm] = useState({ tags: [] as string[], description: '', uploaded: false, uploading: false, error: '', files: [] as File[] });
 
   useEffect(() => {
     updateSosDraft({ symptoms: [], description: '', attachments: [] });
-  }, [updateSosDraft]);
+    setSosDraftFiles([]);
+  }, [updateSosDraft, setSosDraftFiles]);
 
   const toggleSymptom = (s: string) => {
     setForm(prev => {
@@ -34,18 +34,17 @@ export default function PhotoUpload({ navigate, onBack }: Props) {
       setForm(prev => ({ ...prev, error: 'Files must be smaller than 50 MB.' }));
       return;
     }
-    setForm(prev => ({ ...prev, uploading: true, error: '', files: [...prev.files, file] }));
-    try {
-      const dataUrl = await resizeFileToBase64(file);
-      const attachment: DispatchAttachment = { id: `${file.name}-${Date.now()}`, name: file.name, type: file.type.startsWith('video/') ? 'video' : 'image', dataUrl };
-      setForm(prev => {
-        const attachments = [...prev.attachments, attachment];
-        updateSosDraft({ attachments });
-        return { ...prev, attachments, uploaded: true, uploading: false };
-      });
-    } catch {
-      setForm(prev => ({ ...prev, uploading: false, error: 'Upload failed. Try again or skip this file.' }));
+    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+      setForm(prev => ({ ...prev, error: 'Only photos and videos can be attached.' }));
+      return;
     }
+    // Staged in memory only; SOSConfirmation uploads it to sos-media once the
+    // real request exists (the storage path is keyed on its id).
+    setForm(prev => {
+      const files = prev.files.includes(file) ? prev.files : [...prev.files, file];
+      setSosDraftFiles(files);
+      return { ...prev, files, uploaded: true, uploading: false, error: '' };
+    });
   };
 
   return (

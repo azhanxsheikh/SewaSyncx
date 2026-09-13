@@ -159,6 +159,13 @@ export function useLiveTechnicianTracking(
   const lerpTargetPos = useRef<Coordinates | null>(null);
   const lerpStartTime = useRef<number>(0);
   const LERP_DURATION_MS = 1000;
+  // The Realtime handler is registered once per subscription, so it must read
+  // live values through refs — state captured at subscribe time is stale
+  // (the LERP would always start from null and snap instead of interpolating).
+  const smoothedRef = useRef<Coordinates | null>(null);
+  const techRef = useRef<Coordinates | null>(null);
+  const clientRef = useRef<Coordinates | null | undefined>(clientCoordinates);
+  clientRef.current = clientCoordinates;
 
   // LERP animation loop
   const animateLerp = (now: number) => {
@@ -174,7 +181,8 @@ export function useLiveTechnicianTracking(
       lerpStartPos.current.longitude +
       (lerpTargetPos.current.longitude - lerpStartPos.current.longitude) * eased;
 
-    setSmoothedCoords({ latitude: lat, longitude: lon });
+    smoothedRef.current = { latitude: lat, longitude: lon };
+    setSmoothedCoords(smoothedRef.current);
 
     if (progress < 1) {
       animFrameRef.current = requestAnimationFrame(animateLerp);
@@ -208,37 +216,44 @@ export function useLiveTechnicianTracking(
     // Bearing handling
     if (typeof newHeading === 'number' && !isNaN(newHeading)) {
       setBearing(newHeading);
-    } else if (techCoords) {
+    } else if (techRef.current) {
       const calcB = calculateBearing(
-        techCoords.latitude,
-        techCoords.longitude,
+        techRef.current.latitude,
+        techRef.current.longitude,
         newLocation.latitude,
         newLocation.longitude,
       );
       setBearing(calcB);
-    } else if (clientCoordinates) {
+    } else if (clientRef.current) {
       const calcB = calculateBearing(
         newLocation.latitude,
         newLocation.longitude,
-        clientCoordinates.latitude,
-        clientCoordinates.longitude,
+        clientRef.current.latitude,
+        clientRef.current.longitude,
       );
       setBearing(calcB);
     }
 
+    techRef.current = newLocation;
     setTechCoords(newLocation);
 
     // Start smooth interpolation
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
     }
-    lerpStartPos.current = smoothedCoords ?? newLocation;
+    lerpStartPos.current = smoothedRef.current ?? newLocation;
     lerpTargetPos.current = newLocation;
     lerpStartTime.current = performance.now();
     animFrameRef.current = requestAnimationFrame(animateLerp);
   };
 
   useEffect(() => {
+    // New subscription target: previous packets' timestamps and position no
+    // longer apply.
+    lastTimestampRef.current = 0;
+    smoothedRef.current = null;
+    techRef.current = null;
+
     if (!technicianId && !requestId) {
       setTechCoords(null);
       setSmoothedCoords(null);

@@ -34,7 +34,6 @@ import {
 } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from './AuthContext';
-import { notifications as initialNotifications } from '../fixtures/account.fixture';
 import { parseGeoPoint } from '../hooks/useLiveTechnicianTracking';
 import type {
   BookingRecord,
@@ -50,6 +49,7 @@ import type { Database } from '../types/database';
 
 type RequestRow = Database['public']['Tables']['requests']['Row'];
 type DisputeRow = Database['public']['Tables']['disputes']['Row'];
+type NotificationRow = Database['public']['Tables']['notifications']['Row'];
 
 export interface ClientProfileData {
   name: string;
@@ -114,7 +114,7 @@ const EMPTY_STATE: DataState = {
   varianceRequests: [],
   disputes: [],
   justCompletedRequestId: null,
-  notifications: initialNotifications,
+  notifications: [],
   toastMessage: null,
 };
 
@@ -160,6 +160,26 @@ function hashCode(value: string): number {
   return hash;
 }
 
+function formatRelativeTime(iso: string): string {
+  const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
+}
+
+function mapNotification(row: NotificationRow): NotificationRecord {
+  return {
+    id: row.id,
+    title: row.title,
+    time: formatRelativeTime(row.created_at),
+    read: row.is_read,
+    icon: row.icon ?? '🔔',
+  };
+}
+
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
@@ -180,7 +200,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<DataState>(EMPTY_STATE);
 
   const loadClientData = useCallback(async (uid: string): Promise<Partial<DataState>> => {
-    const [userRow, addressRows, familyRows, requestRows, reviewRows] = await Promise.all([
+    const [userRow, addressRows, familyRows, requestRows, reviewRows, notificationRows] = await Promise.all([
       supabase.from('users').select('name, phone, email, default_street_address').eq('id', uid).maybeSingle(),
       supabase.from('saved_addresses').select('*').eq('user_id', uid),
       supabase.from('family_members').select('*').eq('owner_id', uid),
@@ -190,6 +210,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         .eq('client_id', uid)
         .order('created_at', { ascending: false }),
       supabase.from('reviews').select('rating').eq('client_id', uid),
+      supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false })
+        .limit(50),
     ]);
 
     if (userRow.error) console.warn('[data] failed to load client profile:', userRow.error.message);
@@ -197,6 +223,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (familyRows.error) console.warn('[data] failed to load family members:', familyRows.error.message);
     if (requestRows.error) console.warn('[data] failed to load requests:', requestRows.error.message);
     if (reviewRows.error) console.warn('[data] failed to load reviews:', reviewRows.error.message);
+    if (notificationRows.error) console.warn('[data] failed to load notifications:', notificationRows.error.message);
 
     const clientProfile: ClientProfileData | null = userRow.data
       ? {
@@ -277,7 +304,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       averageRating: ratings.length ? ratings.reduce((a, b) => a + b, 0) / ratings.length : 0,
     };
 
-    return { clientProfile, savedAddresses, familyMembers, bookingHistory, currentRequest, clientStats };
+    const notifications = (notificationRows.data ?? []).map(mapNotification);
+
+    return { clientProfile, savedAddresses, familyMembers, bookingHistory, currentRequest, clientStats, notifications };
   }, []);
 
   const loadTechnicianData = useCallback(async (uid: string): Promise<Partial<DataState>> => {
@@ -373,7 +402,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // Client: refresh on any change to one of this client's requests, and flag
   // justCompletedRequestId when one transitions to 'completed' so a screen
-  // can auto-navigate to the invoice view (see App.tsx).
+  // can auto-navigate to the invoice view (see App.tsx). Notifications are
+  // rows in public.notifications written by notify_client_on_status_event in
+  // the same transaction as the status change; the INSERT subscription drives
+  // the bell badge and toast.
   useEffect(() => {
     if (role !== 'client' || !userId) return;
     const channel = supabase
@@ -383,37 +415,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
         { event: 'UPDATE', schema: 'public', table: 'requests', filter: `client_id=eq.${userId}` },
         (payload) => {
           const newRow = payload.new as RequestRow | undefined;
-          let newNotif: NotificationRecord | null = null;
-          if (newRow?.status) {
-            const statusMap: Record<string, { title: string; icon: string }> = {
-              accepted: { title: 'Technician assigned to your emergency request', icon: '👨‍🔧' },
-              en_route: { title: 'Technician is en route to your location', icon: '🚗' },
-              arrived: { title: 'Technician has arrived at your address', icon: '📍' },
-              in_progress: { title: 'Service repair is now in progress', icon: '⚡' },
-              completed: { title: 'Service completed! View your invoice', icon: '🎉' },
-              cancelled: { title: 'Service request has been cancelled', icon: '❌' },
-            };
-            const item = statusMap[newRow.status];
-            if (item) {
-              newNotif = {
-                id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                title: item.title,
-                time: 'Just now',
-                read: false,
-                icon: item.icon,
-              };
-            }
-          }
-
           loadClientData(userId).then((patch) =>
             setState((s) => ({
               ...s,
               ...patch,
               justCompletedRequestId: newRow?.status === 'completed' ? newRow.id : s.justCompletedRequestId,
-              notifications: newNotif ? [newNotif, ...s.notifications] : s.notifications,
-              toastMessage: newNotif ? newNotif.title : s.toastMessage,
             })),
           );
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+        (payload) => {
+          const notification = mapNotification(payload.new as NotificationRow);
+          setState((s) => ({
+            ...s,
+            // The requests UPDATE reload may already have fetched this row.
+            notifications: s.notifications.some((n) => n.id === notification.id)
+              ? s.notifications
+              : [notification, ...s.notifications],
+            toastMessage: notification.title,
+          }));
         },
       )
       .subscribe();
@@ -476,11 +499,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
   }, [userId, role, loadClientData]);
 
   const markNotificationsAsRead = useCallback(() => {
-    setState((s) => ({
-      ...s,
-      notifications: s.notifications.map((n) => ({ ...n, read: true })),
-    }));
-  }, []);
+    setState((s) =>
+      s.notifications.some((n) => !n.read)
+        ? { ...s, notifications: s.notifications.map((n) => ({ ...n, read: true })) }
+        : s,
+    );
+    if (!userId) return;
+    void supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('user_id', userId)
+      .eq('is_read', false)
+      .then(({ error }) => {
+        if (error) console.warn('[data] failed to mark notifications read:', error.message);
+      });
+  }, [userId]);
 
   const clearToast = useCallback(() => {
     setState((s) => (s.toastMessage ? { ...s, toastMessage: null } : s));

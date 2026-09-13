@@ -15,11 +15,18 @@ export type PriceAdjustmentReason =
   | "customer_requested_scope_change"
   | "other"
 
+/**
+ * Evidence media uploaded to the private `sos-media` bucket (DATABASE §13) and
+ * recorded in `request_attachments`. `url` is a short-lived signed URL — never
+ * embedded file data, since jobs are mirrored through localStorage and the
+ * BroadcastChannel bridge.
+ */
 export interface DispatchAttachment {
   id: string
   name: string
   type: "image" | "video"
-  dataUrl: string
+  url: string
+  storagePath: string
 }
 
 export interface DispatchJob {

@@ -120,10 +120,10 @@ export default function ActiveJob() {
             {job.attachments?.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-3">
                 {job.attachments.map((file) => file.type === "video" ? (
-                  <video key={file.id} src={file.dataUrl} controls className="h-24 w-24 rounded-xl object-cover" />
+                  <video key={file.id} src={file.url} controls className="h-24 w-24 rounded-xl object-cover" />
                 ) : (
-                  <a key={file.id} href={file.dataUrl} target="_blank" rel="noreferrer">
-                    <img src={file.dataUrl} alt={file.name} className="h-24 w-24 rounded-xl object-cover" />
+                  <a key={file.id} href={file.url} target="_blank" rel="noreferrer">
+                    <img src={file.url} alt={file.name} className="h-24 w-24 rounded-xl object-cover" />
                   </a>
                 ))}
               </div>

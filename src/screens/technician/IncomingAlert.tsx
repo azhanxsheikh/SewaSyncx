@@ -133,19 +133,19 @@ export default function IncomingAlert({
               file.type === "video" ? (
                 <video
                   key={file.id}
-                  src={file.dataUrl}
+                  src={file.url}
                   controls
                   className="h-24 w-24 rounded-xl object-cover"
                 />
               ) : (
                 <a
                   key={file.id}
-                  href={file.dataUrl}
+                  href={file.url}
                   target="_blank"
                   rel="noreferrer"
                 >
                   <img
-                    src={file.dataUrl}
+                    src={file.url}
                     alt={file.name}
                     className="h-24 w-24 rounded-xl object-cover"
                   />

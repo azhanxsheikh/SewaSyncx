@@ -50,16 +50,20 @@ export function EditProfileModal({
 
     setLoading(true);
     try {
-      const formattedPhone = `+91${cleanPhone}`;
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({
-          name: name.trim(),
-          phone: formattedPhone,
-        })
-        .eq('id', userId);
+      // `authenticated` has no UPDATE grant on users.phone: phone changes go
+      // through complete_profile(), which normalises the number and reports a
+      // taken one as phone_already_registered instead of a raw constraint error.
+      const { error: updateError } = await supabase.rpc('complete_profile', {
+        p_name: name.trim(),
+        p_phone: `+91${cleanPhone}`,
+      });
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        if (updateError.message.includes('phone_already_registered')) {
+          throw new Error('This phone number is already registered to another account.');
+        }
+        throw updateError;
+      }
 
       onUpdated();
       onClose();

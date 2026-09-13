@@ -2,8 +2,6 @@ import { useMemo } from 'react';
 import {
   clientProfile as fixtureClientProfile,
   clientStats as fixtureClientStats,
-  notifications,
-  savedAddresses as fixtureSavedAddresses,
 } from '../fixtures/account.fixture';
 import { useData } from '../context/DataProvider';
 import type {
@@ -16,9 +14,9 @@ import type {
 /**
  * Read contracts for the signed-in client's own records.
  *
- * Real queries, scoped by `auth.uid()` (src/context/DataProvider.tsx), for
- * everything that has a real table. `notifications` stays fixture-backed —
- * there is no `notifications` table in any migration.
+ * Real queries, scoped by `auth.uid()` (src/context/DataProvider.tsx). Lists
+ * are authoritative once loaded, including when empty — a client who deletes
+ * their last address must not be shown fixture rows they cannot edit.
  */
 
 export function useClientProfile() {
@@ -33,7 +31,7 @@ export function useClientStats(): ClientStats {
 
 export function useSavedAddresses(): SavedAddress[] {
   const { ready, savedAddresses } = useData();
-  return ready && savedAddresses.length ? savedAddresses : fixtureSavedAddresses;
+  return ready ? savedAddresses : [];
 }
 
 export function useFamilyMembers(): FamilyMember[] {
@@ -67,8 +65,8 @@ export function useFamilyMember(memberId: string): FamilyMember {
 }
 
 export function useNotifications(): NotificationRecord[] {
-  const { notifications: liveNotifications } = useData();
-  return liveNotifications.length ? liveNotifications : notifications;
+  const { notifications } = useData();
+  return notifications;
 }
 
 export function useUnreadNotificationsCount(): number {

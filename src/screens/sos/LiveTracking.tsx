@@ -6,6 +6,7 @@ import { trackingStages as statuses } from "../../fixtures/requests.fixture"
 import ClientLiveTrackingMap from "../../components/tracking/ClientLiveTrackingMap"
 import { useDispatch } from "../../context/DispatchContext"
 import { useLiveTechnicianTracking } from "../../hooks/useLiveTechnicianTracking"
+import { useData } from "../../context/DataProvider"
 
 interface Props {
   navigate: (s: Screen) => void
@@ -13,6 +14,7 @@ interface Props {
 
 export default function LiveTracking({ navigate }: Props) {
   const { job, setStatus } = useDispatch()
+  const { currentRequest } = useData()
   const tech = useTechnicianProfile(job?.technicianId)
 
   const clientCoords = useMemo(
@@ -28,7 +30,14 @@ export default function LiveTracking({ navigate }: Props) {
     bearing,
     roadDistanceKm,
     etaMinutes: liveEtaMinutes,
-  } = useLiveTechnicianTracking(job?.technicianId, clientCoords, job?.id)
+  } = useLiveTechnicianTracking(
+    // Subscribe with the real request (public.requests) when one is active:
+    // DispatchContext's job id is simulated and matches no
+    // technician_locations.request_id.
+    currentRequest?.technician_id ?? job?.technicianId,
+    clientCoords,
+    currentRequest?.id ?? job?.id,
+  )
 
   const initialEta = 15
   const [eta, setEta] = useState(12)
