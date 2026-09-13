@@ -1,99 +1,120 @@
 import { useState } from "react"
 import { useDispatch } from "../../context/DispatchContext"
-import type { ExecutionStep, JobStatus, PriceAdjustmentReason } from "../../types/dispatch"
+import type { ExecutionStep, PriceAdjustmentReason } from "../../types/dispatch"
 import { executionSteps as steps } from "../../fixtures/requests.fixture"
 import TechnicianDirectionsMap from "../../components/TechnicianDirectionsMap"
-import { supabase } from "../../lib/supabaseClient"
+import { useActiveTechnicianJob, type ConsoleTransition } from "../../context/ActiveTechnicianJobContext"
 import { constructGoogleMapsNavigationUrl } from "../../utils/geocoding"
+import { formatDestinationLabel } from "../../utils/destinationLabel"
+import ServiceSettlementModal from "./ServiceSettlementModal"
 
-export default function ActiveJob() {
-  const { job, updateJobStatus, updateJob } = useDispatch()
+export function formatJobId(id?: string | null): string {
+  if (!id) return "#JOB-000000"
+  if (id.startsWith("#JOB-")) return id
+  const clean = id.replace(/^job-/, "")
+  return `#JOB-${clean.slice(-6).toUpperCase()}`
+}
+
+// Console step -> the request_status advance_request_status moves to.
+// `accepted` is set only by accept_request and `completed` only by
+// settle_job_payment, so neither is sent from here.
+const CONSOLE_TRANSITION: Partial<Record<ExecutionStep, ConsoleTransition>> = {
+  "en-route": "en_route",
+  arrived: "arrived",
+  "in-progress": "in_progress",
+}
+
+export interface ActiveJobProps {
+  onOpenAlerts?: () => void
+}
+
+export default function ActiveJob({ onOpenAlerts }: ActiveJobProps) {
+  const { job } = useDispatch()
+  const { advance, settle, mutating, error, notice } = useActiveTechnicianJob()
   const [showCompletionModal, setShowCompletionModal] = useState(false)
-  const [finalPriceInput, setFinalPriceInput] = useState("")
-  // No adjustment reason is selected until there's actually a variance —
-  // the DB enum has no "no change" value, and a reason is only meaningful
-  // (and only required) once finalPrice exceeds estimatedTotal.
-  const [adjustmentReason, setAdjustmentReason] = useState<PriceAdjustmentReason | undefined>(undefined)
-  const [adjustmentNotes, setAdjustmentNotes] = useState("")
-  const [confirmedVariance, setConfirmedVariance] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  if (
-    !job ||
-    !["accepted", "en-route", "arrived", "in-progress", "completed"].includes(job.status)
-  )
+  if (!job || !["accepted", "en-route", "en_route", "arrived", "in-progress", "in_progress"].includes(job.status)) {
     return (
-      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-12 text-center text-slate-400">
-        Accept a dispatch to start a job.
+      <div className="mx-auto max-w-xl py-6 px-4">
+        <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-8 sm:p-12 text-center shadow-xl backdrop-blur-sm">
+          <div className="relative mx-auto mb-6 flex h-20 w-20 items-center justify-center">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400/20" />
+            <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-500/10">
+              <svg className="w-8 h-8 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 2v2m0 16v2m10-10h-2M4 12H2m15.07-7.07l-1.41 1.41M6.34 17.66l-1.41 1.41m12.14 0l-1.41-1.41M6.34 6.34L4.93 4.93" />
+                <circle cx="12" cy="12" r="3" strokeWidth={1.75} />
+              </svg>
+            </span>
+          </div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs font-semibold mb-3">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>SewaSync Worker Cooperative</span>
+          </div>
+          {notice && (
+            <div className="mt-3 mb-4 rounded-2xl border border-amber-500/30 bg-amber-950/40 p-4 text-left shadow-sm">
+              <p className="mt-1.5 text-sm text-amber-100 font-medium leading-relaxed">{notice}</p>
+            </div>
+          )}
+          <h2 className="font-display text-2xl font-800 text-white tracking-tight">
+            Ready for Dispatch
+          </h2>
+          <p className="mt-2 text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+            You are currently online. New emergency alerts in your operating zone will appear in Incoming Alerts.
+          </p>
+          {onOpenAlerts && (
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={onOpenAlerts}
+                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-700 text-sm shadow-lg shadow-red-600/20 transition-all active:scale-[0.98]"
+              >
+                View Incoming Alerts →
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     )
-  const current = steps.findIndex((step) => step.id === job.executionStep)
-  const next = steps[Math.min(current + 1, steps.length - 1)]
-  const statusForStep: Record<ExecutionStep, JobStatus> = {
-    accepted: "ACCEPTED",
-    "en-route": "ON_THE_WAY",
-    arrived: "ARRIVED",
-    "in-progress": "IN_PROGRESS",
-    completed: "COMPLETED",
   }
 
+  const current = steps.findIndex((step) => step.id === job.executionStep)
+  const next = steps[Math.min(current + 1, steps.length - 1)]
+
   const handleOpenCompletionModal = () => {
-    setFinalPriceInput(String(job.finalPrice ?? job.estimatedTotal ?? 0))
-    setAdjustmentReason(job.priceAdjustmentReason)
-    setAdjustmentNotes(job.priceAdjustmentNotes ?? "")
-    setConfirmedVariance(false)
     setShowCompletionModal(true)
   }
 
-  const parsedPrice = Number(finalPriceInput)
-  const isValidPrice = !isNaN(parsedPrice) && parsedPrice >= 0 && finalPriceInput.trim() !== ""
-  const baseEstimate = job.estimatedTotal ?? 0
-  const delta = isValidPrice ? parsedPrice - baseEstimate : 0
-
-  const handleCompleteJob = async () => {
-    if (!isValidPrice) return
-    if (delta !== 0 && !confirmedVariance) return
-    if (delta > 0 && !adjustmentReason) return
-
-    setIsSubmitting(true)
-    try {
-      if (job.id) {
-        const { data: rpcData, error: rpcError } = await supabase.rpc("settle_job_payment", {
-          p_request_id: job.id,
-          p_final_price: parsedPrice,
-          p_reason: adjustmentReason,
-          p_notes: adjustmentNotes || undefined,
-        })
-        if (rpcError) {
-          console.warn("[technician] settle_job_payment RPC error:", rpcError.message)
-        } else {
-          console.log("[technician] settle_job_payment RPC success:", rpcData)
-        }
-      }
-      updateJob({
-        finalPrice: parsedPrice,
-        priceAdjustmentReason: adjustmentReason,
-        priceAdjustmentNotes: adjustmentNotes || undefined,
-        status: "completed",
-        executionStep: "completed",
-      })
-      updateJobStatus("COMPLETED")
-      setShowCompletionModal(false)
-    } catch (err) {
-      console.error("[technician] completion error:", err)
-    } finally {
-      setIsSubmitting(false)
-    }
+  const handleCompleteJob = async (
+    parsedPrice: number,
+    adjustmentReason?: PriceAdjustmentReason,
+    adjustmentNotes?: string
+  ) => {
+    // Local state becomes "completed" only if settle_job_payment succeeds;
+    // on failure the console shows the reason and re-reads the request.
+    await settle(parsedPrice, adjustmentReason, adjustmentNotes || undefined)
   }
+
+  const formattedJobId = formatJobId(job.id)
+  const destination = formatDestinationLabel(job)
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <p className="text-sm text-emerald-300">Active job · {job.id}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-semibold text-emerald-400">Active job · {formattedJobId}</p>
+          <span className="text-slate-600">·</span>
+          <span className={`text-xs px-2 py-0.5 rounded font-bold ${destination.isFamily ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'}`}>
+            {destination.badge}
+          </span>
+        </div>
         <h1 className="mt-1 font-display text-3xl font-800 capitalize">
           {job.service.replace("-", " ")} emergency
         </h1>
-        <p className="mt-1 text-slate-400">
-          {job.location} · {job.customerName}
+        <p className="mt-1 text-slate-300 font-medium">
+          {destination.fullLabel}
+        </p>
+        <p className="text-xs text-slate-400 mt-0.5">
+          Recipient: {job.customerName} ({job.customerPhone}){destination.isFamily && job.requesterName ? ` · Requested by ${job.requesterName}` : ""}
         </p>
         {job.landmarkAndInstructions && (
           <div className="mt-3 mb-4 rounded-2xl border border-amber-500/30 bg-amber-950/40 p-4 text-left shadow-sm">
@@ -113,7 +134,10 @@ export default function ActiveJob() {
           serviceLatitude={job.serviceLatitude}
           serviceLongitude={job.serviceLongitude}
           serviceAddress={job.location}
+          mode="active"
+          destinationLabel={destination.fullLabel}
         />
+
         {(job.description || job.attachments?.length > 0) && (
           <div className="mt-4 rounded-2xl border border-gray-100 bg-white p-4">
             {job.description && <p className="text-sm text-gray-700">{job.description}</p>}
@@ -178,19 +202,29 @@ export default function ActiveJob() {
             onClick={() => {
               if (next.id === "completed" || current >= steps.length - 1) {
                 handleOpenCompletionModal()
-              } else {
-                updateJobStatus(statusForStep[next.id])
+                return
               }
+              const transition = CONSOLE_TRANSITION[next.id]
+              if (transition) void advance(transition)
             }}
-            disabled={current >= steps.length - 1 && job.status === "completed"}
+            disabled={mutating || (current >= steps.length - 1 && job.status === "completed")}
             className="w-full rounded-xl bg-emerald-500 py-3 font-700 text-white disabled:cursor-not-allowed disabled:bg-slate-700"
           >
             {current >= steps.length - 1 && job.status === "completed"
               ? "Job complete"
-              : next.id === "completed"
-                ? "Complete & Settle Job"
-                : `Mark as ${next.label}`}
+              : mutating
+                ? "Updating…"
+                : next.id === "completed"
+                  ? "Complete & Settle Job"
+                  : next.id === "in-progress"
+                    ? "Start Work"
+                    : `Mark as ${next.label}`}
           </button>
+          {(error || notice) && (
+            <div className="mt-3 rounded-xl border border-red-500/40 bg-red-950/50 p-4 text-sm text-red-200">
+              {error ?? notice}
+            </div>
+          )}
         </div>
         <aside className="space-y-4">
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
@@ -204,7 +238,7 @@ export default function ActiveJob() {
               Call customer
             </a>
             <a
-              href={`https://wa.me/${job.customerPhone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent("Hello, I am your SewaSync technician for job #" + job.id)}`}
+              href={`https://wa.me/${job.customerPhone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Hello, I am your SewaSync technician for ${formattedJobId}`)}`}
               target="_blank"
               rel="noreferrer"
               className="mt-2 block rounded-lg bg-slate-800 py-2 text-center text-sm font-600"
@@ -240,151 +274,12 @@ export default function ActiveJob() {
         </aside>
       </div>
 
-      {showCompletionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/95 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-500">Service settlement</p>
-                <h2 className="font-display text-lg font-800 text-white">
-                  Job Completion & Settlement
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowCompletionModal(false)}
-                className="text-slate-400 text-sm"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3 text-sm">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">
-                  Base estimate
-                </label>
-                <div className="rounded-xl border border-slate-800 bg-slate-800 px-4 py-2.5 font-700 text-white">
-                  ₹{job.estimatedTotal}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">
-                  Final settled price (₹ INR)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  value={finalPriceInput}
-                  onChange={(e) => setFinalPriceInput(e.target.value)}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-white focus:outline-none"
-                  placeholder="e.g. 998"
-                />
-              </div>
-
-              {delta !== 0 && (
-                <div className="rounded-xl border border-slate-800 bg-slate-800 p-3 space-y-1">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-400">Estimate variance</span>
-                    <span
-                      className={`text-xs font-700 ${
-                        delta > 0 ? "text-amber-400" : "text-emerald-300"
-                      }`}
-                    >
-                      {delta > 0 ? `+₹${delta} above estimate` : `-₹${Math.abs(delta)} below estimate`}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    Price differs from estimate. Client agreement confirmation is required.
-                  </p>
-                </div>
-              )}
-
-              {delta !== 0 && (
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1">
-                    Price adjustment reason
-                  </label>
-                  <select
-                    value={adjustmentReason ?? ""}
-                    onChange={(e) =>
-                      setAdjustmentReason((e.target.value || undefined) as PriceAdjustmentReason | undefined)
-                    }
-                    className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-white focus:outline-none"
-                  >
-                    <option value="" disabled={delta > 0}>
-                      {delta > 0 ? "Select a reason" : "No reason (optional)"}
-                    </option>
-                    <option value="additional_parts">
-                      Additional parts replaced
-                    </option>
-                    <option value="additional_labor_time">
-                      Additional labor time
-                    </option>
-                    <option value="access_difficulty">
-                      Access difficulty
-                    </option>
-                    <option value="misdiagnosis_correction">
-                      Misdiagnosis correction
-                    </option>
-                    <option value="customer_requested_scope_change">
-                      Customer requested scope change
-                    </option>
-                    <option value="other">
-                      Other
-                    </option>
-                  </select>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">
-                  Technician notes / rationale (optional)
-                </label>
-                <input
-                  type="text"
-                  value={adjustmentNotes}
-                  onChange={(e) => setAdjustmentNotes(e.target.value)}
-                  placeholder="e.g. Replaced faulty MCB with client approval"
-                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-white focus:outline-none"
-                />
-              </div>
-
-              {delta !== 0 && (
-                <label className="flex items-start gap-2 pt-1 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={confirmedVariance}
-                    onChange={(e) => setConfirmedVariance(e.target.checked)}
-                    className="mt-1"
-                  />
-                  <span className="text-xs text-slate-300">
-                    I confirm the client has approved this price variance.
-                  </span>
-                </label>
-              )}
-            </div>
-
-            <div className="pt-2">
-              <button
-                type="button"
-                onClick={handleCompleteJob}
-                disabled={
-                  isSubmitting ||
-                  !isValidPrice ||
-                  (delta !== 0 && !confirmedVariance) ||
-                  (delta > 0 && !adjustmentReason)
-                }
-                className="w-full rounded-xl bg-emerald-500 py-3 font-700 text-white disabled:cursor-not-allowed disabled:bg-slate-700"
-              >
-                {isSubmitting ? "Submitting settlement..." : "Confirm & Settle Job"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ServiceSettlementModal
+        isOpen={showCompletionModal}
+        onClose={() => setShowCompletionModal(false)}
+        job={job}
+        onSettled={handleCompleteJob}
+      />
     </div>
   )
 }

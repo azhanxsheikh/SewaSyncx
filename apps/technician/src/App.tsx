@@ -1,13 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import TechnicianPortal from '../../../src/screens/TechnicianPortal';
-import { DispatchProvider, useDispatch } from '../../../src/context/DispatchContext';
+import { DispatchProvider } from '../../../src/context/DispatchContext';
 import { AuthProvider, useAuth } from '../../../packages/shared/src/auth';
 import LoginPage from './components/auth/LoginPage';
 import { DataProvider } from '../../../src/context/DataProvider';
-import { supabase } from '../../../packages/shared/src/lib/supabase';
-import type { DispatchJob, DispatchStatus, ExecutionStep } from '../../../src/types/dispatch';
 import { useTechnicianBroadcaster } from './hooks/useTechnicianBroadcaster';
-import { parseGeoPoint } from '../../../src/hooks/useLiveTechnicianTracking';
+import { ActiveTechnicianJobProvider } from './context/ActiveTechnicianJobContext';
 
 function TechnicianBroadcastIndicator() {
   const { isBroadcasting, isSimulating, currentCoordinates, toggleSimulation } = useTechnicianBroadcaster();
@@ -37,121 +35,9 @@ function TechnicianBroadcastIndicator() {
   );
 }
 
-function TechnicianDataLoader({ children }: { children: ReactNode }) {
-  const { userId, role } = useAuth();
-  const { updateJob } = useDispatch();
-
-  useEffect(() => {
-    if (!userId || role !== 'technician') return;
-    const techId: string = userId;
-
-    let cancelled = false;
-
-    async function loadTechnicianRequests() {
-      try {
-        // Query active job assigned to this technician
-        const { data: activeRows, error: activeErr } = await supabase
-          .from('requests')
-          .select('*, service_categories(slug, name), client:client_id(name, phone)')
-          .eq('technician_id', techId)
-          .in('status', ['accepted', 'en_route', 'arrived', 'in_progress'])
-          .order('updated_at', { ascending: false })
-          .limit(1);
-
-        if (activeErr) {
-          console.warn('[technician] error loading active request:', activeErr.message);
-        }
-
-        if (!cancelled && activeRows && activeRows.length > 0) {
-          const r = activeRows[0];
-          const dispatchStatus: DispatchStatus =
-            r.status === 'en_route' ? 'en-route' : r.status === 'in_progress' ? 'in-progress' : (r.status as DispatchStatus);
-          const executionStep: ExecutionStep =
-            r.status === 'en_route' ? 'en-route' : r.status === 'in_progress' ? 'in-progress' : r.status === 'completed' ? 'completed' : 'accepted';
-
-          const coords = parseGeoPoint(r.service_location);
-          const mappedJob: DispatchJob = {
-            id: r.id,
-            service: r.service_categories?.slug || 'ac',
-            priority: r.priority || 'medium',
-            symptoms: r.symptoms || [],
-            description: r.description || '',
-            location: r.address_text || (r.address_line + (r.area ? `, ${r.area}` : '')),
-            customerName: r.contact_name || r.client?.name || 'Abdullah Sheikh',
-            customerPhone: r.contact_phone || r.client?.phone || '+91 98765 43210',
-            estimatedTotal: Number(r.estimated_total),
-            finalPrice: r.final_price ? Number(r.final_price) : undefined,
-            status: dispatchStatus,
-            executionStep,
-            technicianId: techId,
-            technicianName: 'Rahul Kumar',
-            serviceLatitude: coords?.latitude,
-            serviceLongitude: coords?.longitude,
-            landmarkAndInstructions: r.address_notes || undefined,
-            createdAt: new Date(r.created_at).getTime(),
-            updatedAt: new Date(r.updated_at).getTime(),
-            attachments: [],
-          };
-          updateJob(mappedJob);
-          return;
-        }
-
-        // If no active job, query pending requests for the radar
-        const { data: pendingRows, error: pendingErr } = await supabase
-          .from('requests')
-          .select('*, service_categories(slug, name), client:client_id(name, phone)')
-          .eq('status', 'pending')
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        if (pendingErr) {
-          console.warn('[technician] error loading pending requests:', pendingErr.message);
-        }
-
-        if (!cancelled && pendingRows && pendingRows.length > 0) {
-          const r = pendingRows[0];
-          const coords = parseGeoPoint(r.service_location);
-          const mappedJob: DispatchJob = {
-            id: r.id,
-            service: r.service_categories?.slug || 'electrical',
-            priority: r.priority || 'medium',
-            symptoms: r.symptoms || [],
-            description: r.description || '',
-            location: r.address_text || (r.address_line + (r.area ? `, ${r.area}` : '')),
-            customerName: r.contact_name || r.client?.name || 'Customer',
-            customerPhone: r.contact_phone || r.client?.phone || '',
-            estimatedTotal: Number(r.estimated_total),
-            status: 'requested',
-            executionStep: 'accepted',
-            serviceLatitude: coords?.latitude,
-            serviceLongitude: coords?.longitude,
-            landmarkAndInstructions: r.address_notes || undefined,
-            createdAt: new Date(r.created_at).getTime(),
-            updatedAt: new Date(r.updated_at).getTime(),
-            attachments: [],
-          };
-          updateJob(mappedJob);
-        }
-      } catch (err) {
-        console.error('[technician] error loading requests:', err);
-      }
-    }
-
-    void loadTechnicianRequests();
-
-    const channel = supabase
-      .channel(`technician-radar-${techId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, () => {
-        void loadTechnicianRequests();
-      })
-      .subscribe();
-
-    return () => {
-      cancelled = true;
-      void supabase.removeChannel(channel);
-    };
-  }, [userId, role, updateJob]);
-
+// Job state is loaded, transitioned and kept live by
+// ActiveTechnicianJobProvider (src/context/ActiveTechnicianJobContext.tsx).
+function TechnicianShell({ children }: { children: ReactNode }) {
   return (
     <>
       {children}
@@ -208,10 +94,12 @@ function TechnicianAppInner() {
   }
 
   return (
-    <DispatchProvider>
-      <TechnicianDataLoader>
-        <TechnicianPortal />
-      </TechnicianDataLoader>
+    <DispatchProvider inboundSync={false}>
+      <ActiveTechnicianJobProvider>
+        <TechnicianShell>
+          <TechnicianPortal />
+        </TechnicianShell>
+      </ActiveTechnicianJobProvider>
     </DispatchProvider>
   );
 }

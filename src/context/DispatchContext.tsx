@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react"
@@ -102,6 +103,8 @@ interface DispatchContextValue {
     },
   ) => DispatchJob
   updateJob: (patch: Partial<DispatchJob>) => void
+  /** Sets the job exactly (no merge with the previous job), or clears it. */
+  replaceJob: (job: DispatchJob | null) => void
   setStatus: (status: DispatchStatus) => void
   setExecutionStep: (step: ExecutionStep) => void
   acceptJob: () => void
@@ -156,8 +159,24 @@ function publish(event: DispatchEvent) {
   }
 }
 
-export function DispatchProvider({ children }: { children: ReactNode }) {
-  const [job, setJob] = useState<DispatchJob | null>(() => readStoredJob())
+export function DispatchProvider({
+  children,
+  inboundSync = true,
+}: {
+  children: ReactNode
+  /**
+   * When false, the provider never adopts job state from other tabs
+   * (BroadcastChannel, localStorage) or the dev bridge, and does not restore a
+   * stored job on load. The technician surface sets this: its job comes from
+   * public.requests (ActiveTechnicianJobContext), and the prototype transport
+   * replaces the whole job with whatever another tab last published, which
+   * silently reverted the execution console. Outbound publishing is unchanged.
+   */
+  inboundSync?: boolean
+}) {
+  const [job, setJob] = useState<DispatchJob | null>(() => (inboundSync ? readStoredJob() : null))
+  const jobRef = useRef(job)
+  jobRef.current = job
   const [sosDraft, setSosDraft] =
     useState<Pick<DispatchJob, "symptoms" | "description" | "attachments">>({
       symptoms: [],
@@ -182,6 +201,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
   )
 
   useEffect(() => {
+    if (!inboundSync) return
     let channel: BroadcastChannel | null = null
     try {
       channel = new BroadcastChannel(CHANNEL_NAME)
@@ -280,7 +300,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
       window.clearInterval(bridgeTimer)
       window.removeEventListener("storage", onStorage)
     }
-  }, [])
+  }, [inboundSync])
 
   const updateJob = useCallback((patch: Partial<DispatchJob>) => {
     setJob((current) => {
@@ -296,6 +316,31 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
       })
       return next
     })
+  }, [])
+
+  const replaceJob = useCallback((next: DispatchJob | null) => {
+    const previous = jobRef.current
+    setJob(next)
+    // Server re-reads repeat the same job constantly (tab switches, Realtime
+    // echoes); only a real change is worth broadcasting to other surfaces.
+    const unchanged =
+      previous !== null &&
+      next !== null &&
+      previous.id === next.id &&
+      previous.status === next.status &&
+      previous.executionStep === next.executionStep &&
+      previous.finalPrice === next.finalPrice
+    if (next && !unchanged) {
+      writeStorage(STORAGE_KEY, next)
+      publish({ type: "job-updated", job: next })
+      void publishToDispatchBridge({ type: "job-updated", job: next })
+    } else {
+      try {
+        window.localStorage.removeItem(STORAGE_KEY)
+      } catch {
+        // Storage can be blocked; in-memory state is already cleared.
+      }
+    }
   }, [])
 
   const createJob = useCallback(
@@ -426,6 +471,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
       createJob,
       submitSOSRequest,
       updateJob,
+      replaceJob,
       setStatus: (status) => updateJob({ status }),
       setExecutionStep: (executionStep) =>
         updateJob({
@@ -499,6 +545,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
       submitSOSRequest,
       technicianOnline,
       updateJob,
+      replaceJob,
       updateSosDraft,
     ],
   )

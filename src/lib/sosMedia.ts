@@ -67,3 +67,49 @@ export async function uploadSosMedia(
 
   return uploaded;
 }
+
+/**
+ * Fetches pre-work evidence media for a given request from `request_attachments`
+ * and generates authenticated signed URLs from the private `sos-media` bucket.
+ */
+export async function fetchRequestAttachments(requestId: string): Promise<DispatchAttachment[]> {
+  try {
+    const { data: rows, error } = await supabase
+      .from('request_attachments')
+      .select('id, kind, file_name, storage_path')
+      .eq('request_id', requestId);
+
+    if (error || !rows || rows.length === 0) {
+      return [];
+    }
+
+    const attachments: DispatchAttachment[] = [];
+    for (const r of rows) {
+      let url = '';
+      const { data: signed } = await supabase.storage
+        .from(BUCKET)
+        .createSignedUrl(r.storage_path, SIGNED_URL_TTL_SECONDS);
+
+      if (signed?.signedUrl) {
+        url = signed.signedUrl;
+      } else {
+        const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(r.storage_path);
+        url = pub.publicUrl;
+      }
+
+      attachments.push({
+        id: r.id,
+        name: r.file_name || 'pre-job-media',
+        type: r.kind === 'video' ? 'video' : 'image',
+        url,
+        storagePath: r.storage_path,
+      });
+    }
+
+    return attachments;
+  } catch (err) {
+    console.error('[sos-media] fetchRequestAttachments error:', err);
+    return [];
+  }
+}
+
