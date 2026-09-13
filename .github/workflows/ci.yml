@@ -1,0 +1,196 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: "22"
+  # Matches .mise.toml.
+  PNPM_VERSION: "10.34.3"
+  # Pinned: advisor rules change between CLI releases, and every migration and
+  # advisor result in this repo was verified against this version.
+  SUPABASE_CLI_VERSION: "2.84.2"
+
+jobs:
+  lint-and-typecheck:
+    name: Lint and type-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # pnpm must be on PATH before setup-node resolves the pnpm store for caching.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # No linter is configured yet (oxfmt is a formatter only). This step
+      # starts enforcing as soon as a `lint` script is added to package.json.
+      - name: Lint
+        run: pnpm run --if-present lint
+
+      # `vite build` strips types without checking them; this is the only type gate.
+      - name: Type-check (tsc --noEmit)
+        run: pnpm type-check
+
+  build-and-test:
+    name: Build and test
+    needs: lint-and-typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VITE_SUPABASE_URL: http://127.0.0.1:54321
+      VITE_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      # No test runner is configured yet. This step starts enforcing as soon as
+      # a `test` script is added to package.json.
+      - name: Test
+        run: pnpm run --if-present test
+
+      - name: Validate docker-compose.yml
+        run: docker compose config --quiet
+
+      - name: Build container image
+        run: >-
+          docker build
+          --build-arg VITE_SUPABASE_URL
+          --build-arg VITE_SUPABASE_ANON_KEY
+          --tag sewasync-web:ci
+          .
+
+      - name: Smoke-test container
+        run: |
+          docker run --detach --name sewasync-web --publish 8080:80 sewasync-web:ci
+
+          for _ in $(seq 1 30); do
+            status="$(docker inspect --format '{{.State.Health.Status}}' sewasync-web)"
+            [ "$status" = "healthy" ] && break
+            sleep 1
+          done
+          if [ "$status" != "healthy" ]; then
+            echo "::error::Container did not become healthy (status: $status)"
+            exit 1
+          fi
+
+          base=http://127.0.0.1:8080
+          curl --fail --silent --show-error --output /dev/null "$base/index.html"
+
+          # SPA fallback: an unknown client-side route must render the app shell.
+          curl --fail --silent --show-error "$base/sos/live-tracking/ci-check" | grep --quiet 'id="root"'
+
+          # Missing hashed assets must 404 rather than return the HTML shell.
+          code="$(curl --silent --output /dev/null --write-out '%{http_code}' "$base/assets/does-not-exist.js")"
+          [ "$code" = "404" ] || { echo "::error::Missing asset returned $code, expected 404"; exit 1; }
+
+          headers="$(curl --fail --silent --show-error --head "$base/")"
+          for header in "X-Frame-Options: DENY" "X-Content-Type-Options: nosniff"; do
+            printf '%s' "$headers" | grep --quiet --ignore-case "^$header" \
+              || { echo "::error::Missing response header: $header"; exit 1; }
+          done
+
+      - name: Container logs
+        if: failure()
+        run: docker logs sewasync-web || true
+
+  supabase-migration-check:
+    name: Supabase migrations and security lint
+    needs: lint-and-typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # v1 runs on the deprecated Node 20 action runtime; v3 installs the pinned
+      # CLI version from npm.
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+
+      # Containers the checks never touch are skipped to save time and memory.
+      # Storage, Realtime, Auth, REST and Kong stay up: migrations and the seed
+      # depend on their schemas and on the storage bucket upload.
+      - name: Start local Supabase
+        run: supabase start --exclude studio,imgproxy,edge-runtime,logflare,vector,mailpit,supavisor
+
+      - name: Replay all migrations and seed from scratch
+        run: supabase db reset --local --yes
+
+      - name: Lint PL/pgSQL (public, private)
+        run: supabase db lint --local --schema public,private --level warning --fail-on warning
+
+      - name: Security advisors
+        run: supabase db advisors --local --type security --level warn --fail-on warn
+
+      # Lints 0028/0029 are not in the pinned CLI's advisor set; run them directly.
+      - name: SECURITY DEFINER exposure (lints 0028, 0029)
+        run: |
+          project_id="$(sed -n 's/^project_id = "\(.*\)"$/\1/p' supabase/config.toml)"
+          findings="$(docker exec --interactive "supabase_db_${project_id}" \
+            psql --username postgres --no-psqlrc --tuples-only --no-align --set ON_ERROR_STOP=1 \
+            < scripts/ci/security-definer-lints.sql)"
+          if [ -n "$findings" ]; then
+            printf '%s\n' "$findings" | sed 's/^/::error::/'
+            exit 1
+          fi
+          echo "No SECURITY DEFINER functions are executable by anon or authenticated in exposed schemas."
+
+      # Known multiple_permissive_policies warnings exist; reported, not enforced.
+      - name: Performance advisors (report only)
+        run: supabase db advisors --local --type performance --level warn --fail-on none
+
+      - name: Generated types match migrations
+        run: |
+          supabase gen types typescript --local > "$RUNNER_TEMP/database.ts"
+          if ! diff -u src/types/database.ts "$RUNNER_TEMP/database.ts"; then
+            echo "::error file=src/types/database.ts::Out of date. Run: supabase gen types typescript --local > src/types/database.ts"
+            exit 1
+          fi

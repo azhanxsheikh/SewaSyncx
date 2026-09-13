@@ -26,3 +26,6 @@ supabase/.branches/
 # beside it.
 /.plugins/
 /.opencode-skills/
+
+# Committed template for local environment variables
+!.env.example
