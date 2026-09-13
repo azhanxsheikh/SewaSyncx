@@ -33,6 +33,10 @@ const LOCALITY_COORDINATES: Record<string, { lat: number; lng: number }> = {
   'Sector 62 Noida': { lat: 28.6250, lng: 77.3600 },
 };
 
+// Demo dispatch zone: the Gaur City 2 demo requests sit ~1 km away, inside their
+// 10 km radius. Same point as useTechnicianBroadcaster's dev simulation start.
+const DEFAULT_LOCALITY = 'Gaur City';
+
 export function TechnicianSignUpModal({ isOpen, onClose, onSuccess }: TechnicianSignUpModalProps) {
   // Stepper state: 1, 2, 3
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
@@ -55,7 +59,7 @@ export function TechnicianSignUpModal({ isOpen, onClose, onSuccess }: Technician
   // Step 3: Vehicle & Operating Base
   const [vehicleType, setVehicleType] = useState<'Two-Wheeler / Scooter' | 'Three-Wheeler / Auto' | 'Van / Four-Wheeler' | 'None / Public Transit'>('Two-Wheeler / Scooter');
   const [vehicleNumber, setVehicleNumber] = useState('');
-  const [locality, setLocality] = useState('Knowledge Park III');
+  const [locality, setLocality] = useState(DEFAULT_LOCALITY);
   const [isOnline, setIsOnline] = useState(true);
 
   // Submission & error
@@ -207,13 +211,17 @@ export function TechnicianSignUpModal({ isOpen, onClose, onSuccess }: Technician
       }
 
       // 2. Register profile via atomic RPC or direct tables
-      const coords = LOCALITY_COORDINATES[locality] || { lat: 28.4727, lng: 77.4893 };
+      const coords = LOCALITY_COORDINATES[locality] || LOCALITY_COORDINATES[DEFAULT_LOCALITY];
 
       // Attempt atomic RPC first
       try {
         const { error: rpcErr } = await supabase.rpc('register_technician_profile', {
           p_vehicle_type: vehicleType,
-          p_vehicle_registration: vehicleNumber.trim() || null,
+          // The RPC's p_vehicle_registration is a required string (no SQL
+          // default), so an empty string stands in for "not provided" here —
+          // vehicle_registration itself stays nullable in the fallback
+          // direct-insert path below.
+          p_vehicle_registration: vehicleNumber.trim(),
           p_category_ids: selectedCategoryIds,
           p_lat: coords.lat,
           p_lng: coords.lng,

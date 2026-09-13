@@ -61,8 +61,10 @@ export default function TechDashboard({ onOpenAlerts, onOpenActive }: Props) {
 
         if (activeEffect && userData?.name) {
           setTechName(userData.name);
-        } else if (activeEffect && user?.user_metadata?.name) {
-          setTechName(String(user.user_metadata.name));
+        } else if (activeEffect && (user?.user_metadata?.full_name || user?.user_metadata?.name)) {
+          setTechName(String(user?.user_metadata?.full_name || user?.user_metadata?.name));
+        } else if (activeEffect && user?.email) {
+          setTechName(user.email.split('@')[0]);
         }
 
         // 2. Count Today's Jobs (technician_id = auth.uid() and created_at >= CURRENT_DATE)
@@ -76,20 +78,19 @@ export default function TechDashboard({ onOpenAlerts, onOpenActive }: Props) {
           console.warn('[dashboard] error querying today jobs:', jobsErr.message);
         }
 
-        // 3. Earnings for settled jobs completed today
-        const { data: settledJobs, error: earningsErr } = await supabase
-          .from('requests')
-          .select('final_price, estimated_total')
-          .eq('technician_id', activeUid)
-          .eq('status', 'completed')
-          .gte('updated_at', todayIso);
+        // 3. Earnings: invoices has no technician_id column of its own
+        // (docs/DATABASE.md §5) — reach it through requests.technician_id.
+        const { data: invoiceRows, error: earningsErr } = await supabase
+          .from('invoices')
+          .select('total, requests!inner(technician_id)')
+          .eq('requests.technician_id', activeUid);
 
         if (earningsErr) {
           console.warn('[dashboard] error querying today earnings:', earningsErr.message);
         }
 
-        const totalEarned = (settledJobs || []).reduce((sum, r) => {
-          return sum + Number(r.final_price ?? r.estimated_total ?? 0);
+        const totalEarned = (invoiceRows || []).reduce((sum, inv) => {
+          return sum + Number(inv.total || 0);
         }, 0);
 
         // 4. Rating from technician_profiles (Bayesian rating, fall back to "New Worker" if review_count is 0)
@@ -151,6 +152,13 @@ export default function TechDashboard({ onOpenAlerts, onOpenActive }: Props) {
     }
   };
 
+  const displayName = useMemo(() => {
+    const raw = techName && techName !== 'Technician'
+      ? techName
+      : user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Technician';
+    return String(raw).split(' ')[0];
+  }, [techName, user]);
+
   return (
     <div className="space-y-6">
       {/* Header Greeting & Real Date */}
@@ -158,7 +166,7 @@ export default function TechDashboard({ onOpenAlerts, onOpenActive }: Props) {
         <div>
           <p className="text-sm text-slate-400">{formattedDate}</p>
           <h1 className="mt-1 font-display text-3xl font-800 text-white">
-            {greeting}, {techName.split(' ')[0]}
+            {greeting}, {displayName}
           </h1>
         </div>
         <button

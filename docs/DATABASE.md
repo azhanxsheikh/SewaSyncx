@@ -585,7 +585,7 @@ erDiagram
 
 | Table | Columns | Notes |
 |---|---|---|
-| `invoices` | `id` PK; `request_id` FK RESTRICT **UNIQUE**; `invoice_number TEXT UNIQUE NOT NULL`; `subtotal`, `tax`, `total` `NUMERIC(10,2) NOT NULL`; `commission_rate_applied NUMERIC(5,2) NOT NULL`; `issued_at` | Generated on completion; commission rate snapshotted so past invoices stay reproducible |
+| `invoices` | `id` PK; `request_id` FK RESTRICT **UNIQUE**; `user_id`, `client_id` FK `users(id)` RESTRICT; `technician_id` FK `users(id)` SET NULL; `invoice_number TEXT UNIQUE NOT NULL`; `subtotal`, `tax`, `total` `NUMERIC(10,2) NOT NULL`; `commission_rate_applied NUMERIC(5,2) NOT NULL`; `issued_at` | Generated on completion; participant fields synced from request for strict RLS isolation |
 | `invoice_line_items` | `id` PK; `invoice_id` FK CASCADE; `description TEXT NOT NULL`; `amount NUMERIC(10,2) NOT NULL`; `sort_order INTEGER NOT NULL DEFAULT 0` | One line per base service plus one per approved cost addition |
 | `request_cost_additions` | `id` PK; `request_id` FK CASCADE; `reason TEXT NOT NULL`; `tags TEXT[] NOT NULL DEFAULT '{}'`; `amount NUMERIC(10,2) NOT NULL CHECK > 0`; `status cost_addition_status NOT NULL DEFAULT 'pending'`; `created_at`, `resolved_at` | The approval gate for every upward price variance |
 | `payments` | `id` PK; `request_id` FK RESTRICT; `method payment_method NOT NULL`; `status payment_status NOT NULL DEFAULT 'pending'`; `amount NUMERIC(10,2) NOT NULL`; `upi_id TEXT`; `provider_reference TEXT`; `paid_at`, `created_at` | Digital methods traverse `processing`; cash transitions directly on technician attestation |

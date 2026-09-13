@@ -196,7 +196,7 @@ function formatStatus(status: RequestRow['status']): string {
 // ---------------------------------------------------------------------------
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const { status, userId, role, staffRole } = useAuth();
+  const { status, userId, user, role, staffRole } = useAuth();
   const [state, setState] = useState<DataState>(EMPTY_STATE);
 
   const loadClientData = useCallback(async (uid: string): Promise<Partial<DataState>> => {
@@ -207,7 +207,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       supabase
         .from('requests')
         .select('*, service_categories(name, icon), technician:technician_id(name)')
-        .eq('client_id', uid)
+        .eq('user_id', uid)
         .order('created_at', { ascending: false }),
       supabase.from('reviews').select('rating').eq('client_id', uid),
       supabase
@@ -225,16 +225,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
     if (reviewRows.error) console.warn('[data] failed to load reviews:', reviewRows.error.message);
     if (notificationRows.error) console.warn('[data] failed to load notifications:', notificationRows.error.message);
 
-    const clientProfile: ClientProfileData | null = userRow.data
+    const fallbackName =
+      (user?.user_metadata?.full_name as string) ||
+      (user?.user_metadata?.name as string) ||
+      user?.email?.split('@')[0] ||
+      'User';
+    const clientProfile: ClientProfileData = userRow.data
       ? {
           name: userRow.data.name,
           greetingName: userRow.data.name.split(' ')[0] ?? userRow.data.name,
           initial: userRow.data.name.charAt(0).toUpperCase(),
           phone: userRow.data.phone ?? '',
           email: userRow.data.email ?? '',
-          areaLabel: userRow.data.default_street_address ?? '',
+          areaLabel: userRow.data.default_street_address ?? 'Greater Noida',
         }
-      : null;
+      : {
+          name: fallbackName,
+          greetingName: fallbackName.split(' ')[0] || 'User',
+          initial: fallbackName.charAt(0).toUpperCase() || 'U',
+          phone: user?.phone ?? '',
+          email: user?.email ?? '',
+          areaLabel: 'Greater Noida',
+        };
 
     const savedAddresses: SavedAddress[] = (addressRows.data ?? []).map((row) => {
       const coords = parseGeoPoint(row.location);
@@ -314,6 +326,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       .from('requests')
       .select('*, service_categories(name, icon), client:client_id(name)')
       .eq('technician_id', uid)
+      .in('status', ['completed', 'cancelled'])
       .order('created_at', { ascending: false });
 
     if (error) console.warn('[data] failed to load technician job history:', error.message);
@@ -412,7 +425,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       .channel(`client-requests-${userId}`)
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'requests', filter: `client_id=eq.${userId}` },
+        { event: 'UPDATE', schema: 'public', table: 'requests', filter: `user_id=eq.${userId}` },
         (payload) => {
           const newRow = payload.new as RequestRow | undefined;
           loadClientData(userId).then((patch) =>

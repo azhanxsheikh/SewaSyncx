@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { Screen } from '../types/navigation';
 import { bookingFilterTabs as tabs } from '../fixtures/requests.fixture';
-import { useFilteredRequests } from '../hooks/useRequests';
+import { useBookings } from '../hooks/useBookings';
 import { useUnreadNotificationsCount } from '../hooks/useAccount';
 import Header from '../components/Header';
 import BottomNav from '../components/BottomNav';
@@ -15,8 +15,18 @@ interface Props {
 export default function BookingHistory({ navigate }: Props) {
   const [activeTab, setActiveTab] = useState('All');
   const [selectedBooking, setSelectedBooking] = useState<BookingRecord | null>(null);
-  const filtered = useFilteredRequests(activeTab);
+  const { bookings } = useBookings();
   const unreadCount = useUnreadNotificationsCount();
+
+  const filtered = useMemo(() => {
+    return bookings.filter((booking) => {
+      if (activeTab === 'All') return true;
+      if (activeTab === 'SOS') return booking.type === 'sos';
+      if (activeTab === 'Scheduled') return booking.type === 'scheduled';
+      if (activeTab === 'Cancelled') return booking.status === 'Cancelled';
+      return true;
+    });
+  }, [bookings, activeTab]);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
