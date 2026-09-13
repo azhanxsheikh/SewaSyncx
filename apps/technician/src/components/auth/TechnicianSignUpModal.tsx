@@ -217,7 +217,11 @@ export function TechnicianSignUpModal({ isOpen, onClose, onSuccess }: Technician
       try {
         const { error: rpcErr } = await supabase.rpc('register_technician_profile', {
           p_vehicle_type: vehicleType,
-          p_vehicle_registration: vehicleNumber.trim() || null,
+          // The RPC's p_vehicle_registration is a required string (no SQL
+          // default), so an empty string stands in for "not provided" here —
+          // vehicle_registration itself stays nullable in the fallback
+          // direct-insert path below.
+          p_vehicle_registration: vehicleNumber.trim(),
           p_category_ids: selectedCategoryIds,
           p_lat: coords.lat,
           p_lng: coords.lng,

@@ -493,7 +493,6 @@ export type Database = {
           area: string
           category_id: string
           client_id: string
-          user_id: string | null
           completed_at: string | null
           contact_name: string
           contact_phone: string
@@ -523,23 +522,23 @@ export type Database = {
           technician_id: string | null
           technician_location_at_dispatch: unknown
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           accepted_at?: string | null
-          address_line?: string
+          address_line: string
           address_notes?: string | null
           address_text?: string | null
-          area?: string
+          area: string
           category_id: string
-          client_id?: string
-          user_id?: string | null
+          client_id: string
           completed_at?: string | null
           contact_name?: string
           contact_phone?: string
           created_at?: string
           description?: string | null
           estimated_duration_minutes?: number | null
-          estimated_total?: number
+          estimated_total: number
           execution_window?: unknown
           family_member_id?: string | null
           final_price?: number | null
@@ -562,6 +561,7 @@ export type Database = {
           technician_id?: string | null
           technician_location_at_dispatch?: unknown
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           accepted_at?: string | null
@@ -571,7 +571,6 @@ export type Database = {
           area?: string
           category_id?: string
           client_id?: string
-          user_id?: string | null
           completed_at?: string | null
           contact_name?: string
           contact_phone?: string
@@ -601,6 +600,7 @@ export type Database = {
           technician_id?: string | null
           technician_location_at_dispatch?: unknown
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -648,6 +648,13 @@ export type Database = {
           {
             foreignKeyName: "requests_technician_id_fkey"
             columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "requests_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
@@ -733,16 +740,16 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          address_line?: string
+          address_line: string
           address_line1?: string | null
           address_line2?: string | null
-          area?: string
+          area: string
           city?: string | null
           created_at?: string
           icon?: string | null
           id?: string
           is_default?: boolean
-          label?: string
+          label: string
           landmark?: string | null
           latitude?: number | null
           location?: unknown
@@ -1118,6 +1125,8 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string
+          address_notes: string | null
+          address_text: string | null
           area: string
           category_id: string
           client_id: string
@@ -1150,6 +1159,7 @@ export type Database = {
           technician_id: string | null
           technician_location_at_dispatch: unknown
           updated_at: string
+          user_id: string | null
         }
         SetofOptions: {
           from: "*"
@@ -1166,6 +1176,8 @@ export type Database = {
         Returns: {
           accepted_at: string | null
           address_line: string
+          address_notes: string | null
+          address_text: string | null
           area: string
           category_id: string
           client_id: string
@@ -1198,6 +1210,7 @@ export type Database = {
           technician_id: string | null
           technician_location_at_dispatch: unknown
           updated_at: string
+          user_id: string | null
         }
         SetofOptions: {
           from: "*"
@@ -1239,6 +1252,37 @@ export type Database = {
           technician_id: string
           total_jobs: number
         }[]
+      }
+      register_technician_profile: {
+        Args: {
+          p_category_ids: string[]
+          p_lat?: number
+          p_lng?: number
+          p_vehicle_registration: string
+          p_vehicle_type: string
+        }
+        Returns: {
+          background_checked: boolean
+          created_at: string
+          experience_years: number | null
+          id: string
+          identity_verified: boolean
+          is_online: boolean
+          photo_url: string | null
+          rating: number
+          review_count: number
+          skill_verified: boolean
+          total_jobs: number
+          updated_at: string
+          vehicle_registration: string | null
+          vehicle_type: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "technician_profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       report_technician_location: {
         Args: {
@@ -1293,16 +1337,6 @@ export type Database = {
           p_request_id: string
         }
         Returns: Json
-      }
-      register_technician_profile: {
-        Args: {
-          p_category_ids: string[]
-          p_lat?: number | null
-          p_lng?: number | null
-          p_vehicle_registration?: string | null
-          p_vehicle_type?: string | null
-        }
-        Returns: Database["public"]["Tables"]["technician_profiles"]["Row"]
       }
       verify_technician: {
         Args: {
