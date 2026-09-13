@@ -2,13 +2,19 @@
 #
 # Supabase is NOT defined here. The Supabase CLI (`supabase start`) runs its own
 # containers on the `supabase_network_SewaSyncx` network and publishes them on
-# the host (API 127.0.0.1:54321, Postgres 127.0.0.1:54322). The stack bridges to
-# it through the host rather than joining that network, so `docker compose up`
-# works whether or not Supabase is running:
+# the host (API 127.0.0.1:54321, Postgres 127.0.0.1:54322).
 #   - The SPA runs in the browser, so VITE_SUPABASE_URL must be a URL the
 #     browser can reach (http://127.0.0.1:54321), never a container hostname.
-#   - Containers reach Supabase at http://host.docker.internal:54321 and
-#     postgresql://postgres:postgres@host.docker.internal:54322/postgres.
+#   - `web` bridges to Supabase through the host (host.docker.internal), same
+#     as always — it does not need Supabase running to start.
+#   - `redis` additionally joins `supabase_network_SewaSyncx` directly (see
+#     below), because the report_technician_location cache path needs the
+#     supabase_edge_runtime_* container to reach Redis by name, and container
+#     DNS only resolves within a shared network. That makes `redis` (and so
+#     `web`, which depends on it) require Supabase to already be started —
+#     `docker compose up` now fails fast with "network not found" if it
+#     isn't, rather than the previous "works either way." That's a real,
+#     accepted trade-off for the real Redis integration, not an oversight.
 #
 # Values are read from .env (optional; see .env.example).
 
@@ -59,6 +65,11 @@ services:
     ports:
       # Loopback only: a well-known dev password must not be reachable from the LAN.
       - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    networks:
+      - default
+      # Lets the edge-runtime container (running the location-cache Edge
+      # Function) resolve and reach "redis" by container name.
+      - supabase
     volumes:
       - redis_data:/data
     healthcheck:
@@ -69,6 +80,14 @@ services:
       start_period: 5s
       start_interval: 1s
     restart: unless-stopped
+
+networks:
+  default: {}
+  supabase:
+    # Fixed name derived from supabase/config.toml's project_id ("SewaSyncx");
+    # created by `supabase start`, not by this file.
+    name: supabase_network_SewaSyncx
+    external: true
 
 volumes:
   redis_data: {}

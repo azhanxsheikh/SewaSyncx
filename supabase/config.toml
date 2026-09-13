@@ -377,8 +377,18 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
-# [edge_runtime.secrets]
-# secret_key = "env(SECRET_VALUE)"
+[edge_runtime.secrets]
+# Same variable docker-compose.yml reads (.env.example); falls back to the
+# compose default inside the function itself if unset, so this isn't required
+# for local dev to work, only to honour a customised REDIS_PASSWORD.
+REDIS_PASSWORD = "env(REDIS_PASSWORD)"
+
+# Internal-only: called by private.report_technician_location() via pg_net,
+# never reachable through Kong. See the function's own header comment for the
+# accepted local-dev trade-off of skipping JWT verification here.
+[functions.cache-technician-location]
+enabled = true
+verify_jwt = false
 
 [analytics]
 enabled = true
