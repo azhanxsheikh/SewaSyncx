@@ -192,7 +192,9 @@ async function main() {
   }
   const timeline = await rest(abdullah, `request_status_events?request_id=eq.${SCENARIO.A}&select=status,actor_role&order=occurred_at`);
   console.log(`   timeline A: ${timeline.map((e) => `${e.status}(${e.actor_role})`).join(' → ')}`);
-  console.log('   final price + adjustment reason entry: NOT AVAILABLE — settle_job_payment() is not built; see Scenario C');
+  console.log('   final price + adjustment reason: not set here — this walk uses advance_request_status() directly, matching');
+  console.log('   what the technician UI actually calls today; settle_job_payment() now exists (see the migrations) but is');
+  console.log('   not reachable from the browser yet since there is no real technician session. See Scenario C for its shape.');
 
   const [c] = await rest(abdullah, `requests?id=eq.${SCENARIO.C}&select=estimated_total,final_price,price_adjustment_reason,price_adjustment_notes`);
   const [invoice] = await rest(abdullah, `invoices?request_id=eq.${SCENARIO.C}&select=invoice_number,subtotal,tax,total,issued_at`);

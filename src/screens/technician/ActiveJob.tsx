@@ -3,13 +3,16 @@ import { useDispatch } from "../../context/DispatchContext"
 import type { ExecutionStep, JobStatus, PriceAdjustmentReason } from "../../types/dispatch"
 import { executionSteps as steps } from "../../fixtures/requests.fixture"
 import TechnicianDirectionsMap from "../../components/TechnicianDirectionsMap"
-import { advanceRequestStatusRpc } from "../../lib/supabase"
+import { settleJobPaymentRpc } from "../../lib/supabase"
 
 export default function ActiveJob() {
   const { job, updateJobStatus, updateJob } = useDispatch()
   const [showCompletionModal, setShowCompletionModal] = useState(false)
   const [finalPriceInput, setFinalPriceInput] = useState("")
-  const [adjustmentReason, setAdjustmentReason] = useState<PriceAdjustmentReason>("standard_quote")
+  // No adjustment reason is selected until there's actually a variance —
+  // the DB enum has no "no change" value, and a reason is only meaningful
+  // (and only required) once finalPrice exceeds estimatedTotal.
+  const [adjustmentReason, setAdjustmentReason] = useState<PriceAdjustmentReason | undefined>(undefined)
   const [adjustmentNotes, setAdjustmentNotes] = useState("")
   const [confirmedVariance, setConfirmedVariance] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -34,8 +37,8 @@ export default function ActiveJob() {
   }
 
   const handleOpenCompletionModal = () => {
-    setFinalPriceInput(String(job.finalPrice ?? job.estimatedTotal ?? 998))
-    setAdjustmentReason(job.priceAdjustmentReason ?? "standard_quote")
+    setFinalPriceInput(String(job.finalPrice ?? job.estimatedTotal ?? 0))
+    setAdjustmentReason(job.priceAdjustmentReason)
     setAdjustmentNotes(job.priceAdjustmentNotes ?? "")
     setConfirmedVariance(false)
     setShowCompletionModal(true)
@@ -49,21 +52,26 @@ export default function ActiveJob() {
   const handleCompleteJob = async () => {
     if (!isValidPrice) return
     if (delta !== 0 && !confirmedVariance) return
+    if (delta > 0 && !adjustmentReason) return
 
     setIsSubmitting(true)
     try {
       if (job.id) {
-        const res = await advanceRequestStatusRpc(
+        const res = await settleJobPaymentRpc(
           job.id,
-          "completed",
           parsedPrice,
           adjustmentReason,
           adjustmentNotes || undefined,
         )
         if (res.error) {
-          console.warn("[technician] advance_request_status RPC error:", res.error)
+          // Expected today: settle_job_payment requires auth.uid() to match
+          // the request's technician_id, and this app has no real session
+          // yet (see docs/DEPLOYMENT roadmap) — every call authenticates as
+          // the anon key, so this always fails server-side for now. Local
+          // state still advances below so the demo flow keeps working.
+          console.warn("[technician] settle_job_payment RPC error:", res.error)
         } else {
-          console.log("[technician] advance_request_status RPC success:", res.data)
+          console.log("[technician] settle_job_payment RPC success:", res.data)
         }
       }
       updateJob({
@@ -284,32 +292,42 @@ export default function ActiveJob() {
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">
-                  Price adjustment reason
-                </label>
-                <select
-                  value={adjustmentReason}
-                  onChange={(e) =>
-                    setAdjustmentReason(e.target.value as PriceAdjustmentReason)
-                  }
-                  className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-white focus:outline-none"
-                >
-                  <option value="standard_quote">Standard quote (No change)</option>
-                  <option value="additional_parts_replaced">
-                    Additional parts replaced
-                  </option>
-                  <option value="unforeseen_complexity">
-                    Unforeseen complexity
-                  </option>
-                  <option value="extended_labor_hours">
-                    Extended labor hours
-                  </option>
-                  <option value="emergency_surcharge">
-                    Emergency surcharge
-                  </option>
-                </select>
-              </div>
+              {delta !== 0 && (
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1">
+                    Price adjustment reason
+                  </label>
+                  <select
+                    value={adjustmentReason ?? ""}
+                    onChange={(e) =>
+                      setAdjustmentReason((e.target.value || undefined) as PriceAdjustmentReason | undefined)
+                    }
+                    className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-white focus:outline-none"
+                  >
+                    <option value="" disabled={delta > 0}>
+                      {delta > 0 ? "Select a reason" : "No reason (optional)"}
+                    </option>
+                    <option value="additional_parts">
+                      Additional parts replaced
+                    </option>
+                    <option value="additional_labor_time">
+                      Additional labor time
+                    </option>
+                    <option value="access_difficulty">
+                      Access difficulty
+                    </option>
+                    <option value="misdiagnosis_correction">
+                      Misdiagnosis correction
+                    </option>
+                    <option value="customer_requested_scope_change">
+                      Customer requested scope change
+                    </option>
+                    <option value="other">
+                      Other
+                    </option>
+                  </select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs text-slate-400 mb-1">
@@ -346,7 +364,8 @@ export default function ActiveJob() {
                 disabled={
                   isSubmitting ||
                   !isValidPrice ||
-                  (delta !== 0 && !confirmedVariance)
+                  (delta !== 0 && !confirmedVariance) ||
+                  (delta > 0 && !adjustmentReason)
                 }
                 className="w-full rounded-xl bg-emerald-500 py-3 font-700 text-white disabled:cursor-not-allowed disabled:bg-slate-700"
               >

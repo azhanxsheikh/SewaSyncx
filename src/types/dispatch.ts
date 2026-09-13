@@ -4,12 +4,16 @@ export type JobStatus = "PENDING_TECHNICIAN_ACCEPTANCE" | "ACCEPTED" | "ON_THE_W
 
 export type ExecutionStep = "accepted" | "en-route" | "arrived" | "in-progress" | "completed"
 
+// Mirrors the database enum public.price_adjustment_reason exactly
+// (supabase/migrations/20260912000001_core_schema.sql). Only meaningful
+// when final_price exceeds estimatedTotal — see settle_job_payment.
 export type PriceAdjustmentReason =
-  | "standard_quote"
-  | "additional_parts_replaced"
-  | "unforeseen_complexity"
-  | "extended_labor_hours"
-  | "emergency_surcharge"
+  | "additional_parts"
+  | "additional_labor_time"
+  | "access_difficulty"
+  | "misdiagnosis_correction"
+  | "customer_requested_scope_change"
+  | "other"
 
 export interface DispatchAttachment {
   id: string

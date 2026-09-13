@@ -64,21 +64,40 @@ export async function acceptRequestRpc(p_request_id: string, p_technician_id: st
 }
 
 /**
- * Invokes the advance_request_status RPC to transition request status and record settlement pricing.
+ * Invokes the advance_request_status RPC to transition request status.
+ * Takes no pricing arguments — the real RPC never accepted them (see
+ * settleJobPaymentRpc below for settlement). Not currently called anywhere:
+ * nothing yet drives the technician-side en_route/arrived/in_progress
+ * transitions through the real backend, only through local dispatch state.
  */
 export async function advanceRequestStatusRpc(
   p_request_id: string,
   p_next_status: Database['public']['Enums']['request_status'],
-  p_final_price?: number,
-  p_reason?: string,
-  p_notes?: string,
 ) {
-  return callRpc('advance_request_status' as any, {
+  return callRpc('advance_request_status', {
     p_request_id,
     p_next_status,
-    ...(p_final_price !== undefined ? { p_final_price } : {}),
+  });
+}
+
+/**
+ * Invokes settle_job_payment: records the technician's final price and
+ * adjustment reason, walks the request through to `completed`, and
+ * generates its invoice. p_reason is required whenever p_final_price
+ * exceeds the request's estimated_total, and must already have an approved
+ * request_cost_additions row covering the difference.
+ */
+export async function settleJobPaymentRpc(
+  p_request_id: string,
+  p_final_price: number,
+  p_reason?: Database['public']['Enums']['price_adjustment_reason'],
+  p_notes?: string,
+) {
+  return callRpc('settle_job_payment', {
+    p_request_id,
+    p_final_price,
     ...(p_reason !== undefined ? { p_reason } : {}),
     ...(p_notes !== undefined ? { p_notes } : {}),
-  } as any);
+  });
 }
 
