@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import type { Screen } from './types/navigation';
 
 import Home from './screens/Home';
@@ -25,10 +25,10 @@ import ScheduledBooking from './screens/ScheduledBooking';
 import BookingHistory from './screens/BookingHistory';
 import Profile from './screens/Profile';
 import Notifications from './screens/Notifications';
-import AdminDashboard from './components/admin/AdminDashboard';
 import Login from './components/Login';
 import { DispatchProvider } from './context/DispatchContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { DataProvider, useData } from './context/DataProvider';
 import SOSRouteErrorBoundary from './components/SOSRouteErrorBoundary';
 import { getAppTarget } from './lib/appTarget';
 
@@ -38,7 +38,9 @@ type ScheduledSubScreen = 'category' | 'service' | 'datetime' | 'address' | 'pri
 export default function App() {
   return (
     <AuthProvider>
-      <AppInner />
+      <DataProvider>
+        <AppInner />
+      </DataProvider>
     </AuthProvider>
   );
 }
@@ -47,7 +49,7 @@ function AppInner() {
   // Resolved once per render from env/port/path, not component state: which
   // surface this build serves is fixed for its lifetime (see lib/appTarget).
   const target = getAppTarget();
-  const { status } = useAuth();
+  const { status, staffRole } = useAuth();
 
   const [screen, setScreen] = useState<Screen>('home');
   const [prevScreen, setPrevScreen] = useState<Screen>('home');
@@ -73,6 +75,18 @@ function AppInner() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Real request completion (Realtime, DataProvider) auto-navigates to the
+  // invoice screen. DigitalInvoice.tsx itself still renders from
+  // DispatchContext's own job state, not this real row — see
+  // DataProvider.tsx's justCompletedRequestId comment for that boundary.
+  const { justCompletedRequestId, clearJustCompleted } = useData();
+  useEffect(() => {
+    if (!justCompletedRequestId) return;
+    navigate('sos-invoice');
+    clearJustCompleted();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [justCompletedRequestId, clearJustCompleted]);
+
   const goBack = () => {
     navigate(prevScreen);
   };
@@ -90,12 +104,24 @@ function AppInner() {
   }
 
   if (target === 'admin') {
-    // Staff-role verification (platform_staff) lands with the governance
-    // migration; for now, admin only requires any authenticated session.
     if (status === 'signed-out') {
       return <Login title="SewaSync Ops Console" subtitle="Staff sign-in" theme="dark" />;
     }
-    return <AdminDashboard navigate={navigate} onBack={() => {}} />;
+    if (!staffRole) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
+          <div className="max-w-sm rounded-2xl border border-slate-800 bg-slate-900 p-6 text-center">
+            <p className="font-display text-lg font-800 text-white">Not authorised</p>
+            <p className="mt-2 text-sm text-slate-400">
+              This account isn't registered as SewaSync staff. Sign in with a platform_staff
+              account to reach the Ops console.
+            </p>
+          </div>
+        </div>
+      );
+    }
+    window.location.href = window.location.hostname === 'localhost' ? 'http://localhost:3003' : '/admin';
+    return null;
   }
 
   if (status === 'signed-out') {
@@ -175,7 +201,10 @@ function AppInner() {
     'sos-invoice': (
       <DigitalInvoice
         navigate={navigate}
-        onBack={() => navigate('sos-completed')}
+        onBack={() => {
+          clearJustCompleted();
+          navigate(prevScreen === 'sos-completed' ? 'bookings' : (prevScreen || 'home'));
+        }}
       />
     ),
     'sos-payment': (
@@ -256,7 +285,7 @@ function AppInner() {
     bookings: <BookingHistory navigate={navigate} />,
     profile: <Profile navigate={navigate} />,
     notifications: <Notifications navigate={navigate} onBack={() => navigate(prevScreen)} />,
-    admin: <AdminDashboard navigate={navigate} onBack={() => navigate('profile')} />,
+    admin: <div className="p-4 text-center text-sm text-gray-500">Redirecting to Admin Ops Console...</div>,
   };
 
   return (

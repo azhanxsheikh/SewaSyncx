@@ -1,3 +1,17 @@
+/**
+ * @deprecated As of src/context/DataProvider.tsx, this is no longer the
+ * primary data source for any screen — every hook that has a real
+ * Supabase query behind it (see src/hooks/) reads from DataProvider first
+ * and only falls back to the fixture data derived from this file when:
+ * (a) the initial fetch hasn't resolved yet, (b) the signed-in user
+ * genuinely has none of that data yet, or (c) no real query is possible at
+ * all for that shape (useTechnicians() — see its own doc comment for why).
+ *
+ * Not deleted, because those fallbacks are real and depended-on, not dead
+ * code — src/fixtures/*.fixture.ts still import from here for exactly
+ * those cases. Do not add new features against this file; wire a real
+ * query in DataProvider.tsx instead, the way the ones above already are.
+ */
 import type { Database } from '../types/database';
 import type {
   AdditionalWorkRequest,
@@ -486,6 +500,7 @@ export const dbRequests: RequestRow[] = [
   {
     id: 'b1',
     client_id: 'u_client_1',
+    user_id: 'u_client_1',
     technician_id: 't1',
     category_id: 'electrical',
     offering_id: null,
@@ -495,6 +510,8 @@ export const dbRequests: RequestRow[] = [
     contact_phone: '+91 99876 54321',
     address_line: 'B-204, Gaur City 2',
     area: 'Greater Noida West',
+    address_text: null,
+    address_notes: null,
     saved_address_id: 'a1',
     family_member_id: null,
     service_location: null,
@@ -520,6 +537,7 @@ export const dbRequests: RequestRow[] = [
   {
     id: 'b2',
     client_id: 'u_client_1',
+    user_id: 'u_client_1',
     technician_id: 't3',
     category_id: 'ac',
     offering_id: 'off_ac_2',
@@ -529,6 +547,8 @@ export const dbRequests: RequestRow[] = [
     contact_phone: '+91 99876 54321',
     address_line: 'B-204, Gaur City 2',
     area: 'Greater Noida West',
+    address_text: null,
+    address_notes: null,
     saved_address_id: 'a1',
     family_member_id: null,
     service_location: null,
@@ -554,6 +574,7 @@ export const dbRequests: RequestRow[] = [
   {
     id: 'b3',
     client_id: 'u_client_1',
+    user_id: 'u_client_1',
     technician_id: 't2',
     category_id: 'plumbing',
     offering_id: 'off_pl_2',
@@ -563,6 +584,8 @@ export const dbRequests: RequestRow[] = [
     contact_phone: '+91 99876 54321',
     address_line: 'B-204, Gaur City 2',
     area: 'Greater Noida West',
+    address_text: null,
+    address_notes: null,
     saved_address_id: 'a1',
     family_member_id: null,
     service_location: null,
@@ -588,6 +611,7 @@ export const dbRequests: RequestRow[] = [
   {
     id: 'b4',
     client_id: 'u_client_1',
+    user_id: 'u_client_1',
     technician_id: null,
     category_id: 'cleaning',
     offering_id: 'off_cl_1',
@@ -597,6 +621,8 @@ export const dbRequests: RequestRow[] = [
     contact_phone: '+91 99876 54321',
     address_line: 'B-204, Gaur City 2',
     area: 'Greater Noida West',
+    address_text: null,
+    address_notes: null,
     saved_address_id: 'a1',
     family_member_id: null,
     service_location: null,
@@ -622,6 +648,7 @@ export const dbRequests: RequestRow[] = [
   {
     id: 'b5',
     client_id: 'u_client_1',
+    user_id: 'u_client_1',
     technician_id: null,
     category_id: 'pest',
     offering_id: null,
@@ -631,6 +658,8 @@ export const dbRequests: RequestRow[] = [
     contact_phone: '+91 99876 54321',
     address_line: 'B-204, Gaur City 2',
     area: 'Greater Noida West',
+    address_text: null,
+    address_notes: null,
     saved_address_id: 'a1',
     family_member_id: null,
     service_location: null,
@@ -704,6 +733,13 @@ export const dbSavedAddresses: SavedAddressRow[] = [
     label: 'Home',
     icon: '🏠',
     address_line: 'B-204, Gaur City 2, Greater Noida West',
+    address_line1: 'B-204, Gaur City 2',
+    address_line2: '14th Avenue',
+    landmark: 'Near City Plaza roundabout',
+    city: 'Greater Noida West',
+    postal_code: '201318',
+    latitude: 28.6083,
+    longitude: 77.4267,
     area: 'Greater Noida, UP 201318',
     is_default: true,
     location: null,
@@ -716,6 +752,13 @@ export const dbSavedAddresses: SavedAddressRow[] = [
     label: 'Work',
     icon: '🏢',
     address_line: '14th Floor, Tower C, World Trade Centre',
+    address_line1: '14th Floor, Tower C',
+    address_line2: 'World Trade Centre',
+    landmark: 'Opposite Metro Station',
+    city: 'Noida',
+    postal_code: '201301',
+    latitude: 28.5700,
+    longitude: 77.3200,
     area: 'Sector 16, Noida, UP 201301',
     is_default: false,
     location: null,
@@ -728,6 +771,13 @@ export const dbSavedAddresses: SavedAddressRow[] = [
     label: "Papa's Home",
     icon: '🏡',
     address_line: 'A-47, Sector 62',
+    address_line1: 'A-47',
+    address_line2: 'Sector 62',
+    landmark: 'Near Fortis Hospital',
+    city: 'Noida',
+    postal_code: '201309',
+    latitude: 28.6280,
+    longitude: 77.3649,
     area: 'Noida, Uttar Pradesh 201309',
     is_default: false,
     location: null,

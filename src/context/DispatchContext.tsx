@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react"
@@ -83,10 +84,10 @@ interface DispatchContextValue {
   confirmedLocation: ConfirmedLocation
   setConfirmedLocation: (location: ConfirmedLocation) => void
   createJob: (
-    input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "customerName" | "customerPhone" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude">>,
+    input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "customerName" | "customerPhone" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude" | "landmarkAndInstructions">>,
   ) => DispatchJob
   submitSOSRequest: (
-    input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude">> & {
+    input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude" | "landmarkAndInstructions">> & {
       locationOverride?: { address: string; area: string }
       requestedFor?: {
         memberId: string
@@ -102,6 +103,8 @@ interface DispatchContextValue {
     },
   ) => DispatchJob
   updateJob: (patch: Partial<DispatchJob>) => void
+  /** Sets the job exactly (no merge with the previous job), or clears it. */
+  replaceJob: (job: DispatchJob | null) => void
   setStatus: (status: DispatchStatus) => void
   setExecutionStep: (step: ExecutionStep) => void
   acceptJob: () => void
@@ -115,6 +118,9 @@ interface DispatchContextValue {
   updateSosDraft: (
     patch: Partial<Pick<DispatchJob, "symptoms" | "description" | "attachments">>,
   ) => void
+  sosDraft: Pick<DispatchJob, "symptoms" | "description" | "attachments">
+  sosDraftFiles: File[]
+  setSosDraftFiles: (files: File[]) => void
 }
 
 const DispatchContext = createContext<DispatchContextValue | null>(null)
@@ -153,41 +159,34 @@ function publish(event: DispatchEvent) {
   }
 }
 
-export function resizeFileToBase64(file: File, maxSize = 640): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(reader.error)
-    reader.onload = () => {
-      if (!file.type.startsWith("image/")) {
-        resolve(String(reader.result))
-        return
-      }
-      const image = new Image()
-      image.onerror = () => reject(new Error("Unable to read image"))
-      image.onload = () => {
-        const scale = Math.min(1, maxSize / Math.max(image.width, image.height))
-        const canvas = document.createElement("canvas")
-        canvas.width = Math.max(1, Math.round(image.width * scale))
-        canvas.height = Math.max(1, Math.round(image.height * scale))
-        canvas
-          .getContext("2d")
-          ?.drawImage(image, 0, 0, canvas.width, canvas.height)
-        resolve(canvas.toDataURL("image/jpeg", 0.78))
-      }
-      image.src = String(reader.result)
-    }
-    reader.readAsDataURL(file)
-  })
-}
-
-export function DispatchProvider({ children }: { children: ReactNode }) {
-  const [job, setJob] = useState<DispatchJob | null>(() => readStoredJob())
+export function DispatchProvider({
+  children,
+  inboundSync = true,
+}: {
+  children: ReactNode
+  /**
+   * When false, the provider never adopts job state from other tabs
+   * (BroadcastChannel, localStorage) or the dev bridge, and does not restore a
+   * stored job on load. The technician surface sets this: its job comes from
+   * public.requests (ActiveTechnicianJobContext), and the prototype transport
+   * replaces the whole job with whatever another tab last published, which
+   * silently reverted the execution console. Outbound publishing is unchanged.
+   */
+  inboundSync?: boolean
+}) {
+  const [job, setJob] = useState<DispatchJob | null>(() => (inboundSync ? readStoredJob() : null))
+  const jobRef = useRef(job)
+  jobRef.current = job
   const [sosDraft, setSosDraft] =
     useState<Pick<DispatchJob, "symptoms" | "description" | "attachments">>({
       symptoms: [],
       description: "",
       attachments: [],
     })
+  // Evidence picked during SOS intake, held in memory only (never serialised
+  // into the job mirror) until SOSConfirmation has a real request id to upload
+  // it under — see lib/sosMedia.ts.
+  const [sosDraftFiles, setSosDraftFiles] = useState<File[]>([])
   const [technicianOnline, setTechnicianOnline] = useState(true)
   const [confirmedLocation, setConfirmedLocation] = useState<ConfirmedLocation>(
     defaultConfirmedLocation,
@@ -202,6 +201,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
   )
 
   useEffect(() => {
+    if (!inboundSync) return
     let channel: BroadcastChannel | null = null
     try {
       channel = new BroadcastChannel(CHANNEL_NAME)
@@ -300,12 +300,12 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
       window.clearInterval(bridgeTimer)
       window.removeEventListener("storage", onStorage)
     }
-  }, [])
+  }, [inboundSync])
 
   const updateJob = useCallback((patch: Partial<DispatchJob>) => {
     setJob((current) => {
-      if (!current) return current
-      const next = { ...current, ...patch, updatedAt: Date.now() }
+      if (!current && !patch.id) return current
+      const next = current ? { ...current, ...patch, updatedAt: Date.now() } : (patch as DispatchJob)
       writeStorage(STORAGE_KEY, next)
       publish({ type: "job-updated", job: next })
       void publishToDispatchBridge({ type: "job-updated", job: next })
@@ -318,9 +318,34 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const replaceJob = useCallback((next: DispatchJob | null) => {
+    const previous = jobRef.current
+    setJob(next)
+    // Server re-reads repeat the same job constantly (tab switches, Realtime
+    // echoes); only a real change is worth broadcasting to other surfaces.
+    const unchanged =
+      previous !== null &&
+      next !== null &&
+      previous.id === next.id &&
+      previous.status === next.status &&
+      previous.executionStep === next.executionStep &&
+      previous.finalPrice === next.finalPrice
+    if (next && !unchanged) {
+      writeStorage(STORAGE_KEY, next)
+      publish({ type: "job-updated", job: next })
+      void publishToDispatchBridge({ type: "job-updated", job: next })
+    } else {
+      try {
+        window.localStorage.removeItem(STORAGE_KEY)
+      } catch {
+        // Storage can be blocked; in-memory state is already cleared.
+      }
+    }
+  }, [])
+
   const createJob = useCallback(
     (
-      input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "customerName" | "customerPhone" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude">>,
+      input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "customerName" | "customerPhone" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude" | "landmarkAndInstructions">>,
     ) => {
       const next: DispatchJob = {
         id: `job-${Date.now()}`,
@@ -340,6 +365,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
         requestedForRelation: input.requestedForRelation,
         serviceLatitude: input.serviceLatitude,
         serviceLongitude: input.serviceLongitude,
+        landmarkAndInstructions: input.landmarkAndInstructions,
         searchRadiusKm: 10,
         estimatedTotal: estimateJobTotal(input.service, input.priority ?? "medium"),
         createdAt: Date.now(),
@@ -365,7 +391,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
 
   const submitSOSRequest = useCallback(
     (
-      input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude">> & {
+      input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude" | "landmarkAndInstructions">> & {
         locationOverride?: { address: string; area: string }
         requestedFor?: {
           memberId: string
@@ -391,6 +417,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
         location,
         serviceLatitude: input.serviceLatitude ?? (requestedFor ? undefined : confirmedLocation.latitude),
         serviceLongitude: input.serviceLongitude ?? (requestedFor ? undefined : confirmedLocation.longitude),
+        landmarkAndInstructions: input.landmarkAndInstructions ?? (requestedFor ? undefined : confirmedLocation.landmarkAndInstructions),
         ...(requestedFor
           ? {
               customerName: requestedFor.name,
@@ -444,6 +471,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
       createJob,
       submitSOSRequest,
       updateJob,
+      replaceJob,
       setStatus: (status) => updateJob({ status }),
       setExecutionStep: (executionStep) =>
         updateJob({
@@ -504,8 +532,12 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
               attachments: [...current.attachments, ...attachments],
             })),
       updateSosDraft,
+      sosDraft,
+      sosDraftFiles,
+      setSosDraftFiles,
     }),
     [
+      sosDraftFiles,
       createJob,
       confirmedLocation,
       job,
@@ -513,6 +545,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
       submitSOSRequest,
       technicianOnline,
       updateJob,
+      replaceJob,
       updateSosDraft,
     ],
   )

@@ -284,6 +284,13 @@ erDiagram
 | `icon` | `TEXT` | NULL | — | User-chosen marker |
 | `address_line` | `TEXT` | NOT NULL | — | — |
 | `area` | `TEXT` | NOT NULL | — | — |
+| `address_line1` | `TEXT` | NULL | — | House/Flat/Floor door details |
+| `address_line2` | `TEXT` | NULL | — | Society/Apartment/Colony |
+| `landmark` | `TEXT` | NULL | — | Landmark & Entry instructions for technician |
+| `city` | `TEXT` | NULL | — | Locality / City |
+| `postal_code` | `TEXT` | NULL | — | 6-digit Indian PIN code |
+| `latitude` | `NUMERIC(10,7)` | NULL | — | Latitude coordinate |
+| `longitude` | `NUMERIC(10,7)` | NULL | — | Longitude coordinate |
 | `location` | `GEOGRAPHY(Point,4326)` | NULL | — | — |
 | `is_default` | `BOOLEAN` | NOT NULL | `false` | Partial UNIQUE on `(user_id) WHERE is_default` |
 | `created_at` / `updated_at` | `TIMESTAMPTZ` | NOT NULL | `now()` | — |
@@ -313,6 +320,7 @@ erDiagram
 |---|---|---|---|---|
 | `id` | `UUID` | NOT NULL | `gen_random_uuid()` | PK |
 | `client_id` | `UUID` | NOT NULL | — | FK → `users(id)` ON DELETE RESTRICT |
+| `user_id` | `UUID` | NULL | — | FK → `users(id)`; synced with `client_id` |
 | `family_member_id` | `UUID` | NULL | — | FK → `family_members(id)` ON DELETE SET NULL |
 | `saved_address_id` | `UUID` | NULL | — | FK → `saved_addresses(id)` ON DELETE SET NULL |
 | `technician_id` | `UUID` | NULL | — | FK → `users(id)` ON DELETE SET NULL; RPC-only write |
@@ -323,6 +331,8 @@ erDiagram
 | `service_location` | `GEOGRAPHY(Point,4326)` | NOT NULL | — | Sole spatial truth |
 | `address_line` | `TEXT` | NOT NULL | — | Immutable snapshot |
 | `area` | `TEXT` | NOT NULL | — | Immutable snapshot |
+| `address_text` | `TEXT` | NULL | — | Full address string; synced with `address_line` |
+| `address_notes` | `TEXT` | NULL | — | Landmark & Entry instructions for technician |
 | `contact_name` | `TEXT` | NOT NULL | — | Snapshot (trigger-populated) |
 | `contact_phone` | `TEXT` | NOT NULL | — | Snapshot, E.164 |
 | `technician_location_at_dispatch` | `GEOGRAPHY(Point,4326)` | NULL | — | Captured inside `accept_request()` |
@@ -785,6 +795,15 @@ All functions: `SECURITY DEFINER`, `SET search_path = public`, `READ COMMITTED` 
 | Effects (atomic) | Sets resolution and `resolved_at`; applies the consequent escrow/refund/payout adjustment; writes one `admin_actions` row with the mandatory justification |
 | Deliberate non-effect | Does **not** apply technician throttles or suspensions — eligibility action remains a separate, separately-audited administrative decision |
 | Exceptions | `dispute_not_found_or_resolved`, `caller_not_staff`, `liability_amount_required` |
+
+### 11.6 `register_technician_profile(p_vehicle_type, p_vehicle_registration, p_category_ids, p_lat, p_lng)`
+
+| Aspect | Specification |
+|---|---|
+| Returns | Created `technician_profiles` row |
+| Preconditions | Caller authenticated |
+| Effects (atomic) | Sets `users.role='technician'`; inserts `technician_profiles`; inserts 1–3 `technician_categories`; initializes `technician_locations` at base coordinates |
+| Exceptions | `not_authenticated`, `category_count_out_of_bounds` |
 
 ---
 

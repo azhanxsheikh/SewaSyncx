@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type L from "leaflet"
 import type { Screen } from "../../types/navigation"
 import { useTechnicianProfile } from "../../hooks/useTechnicians"
 import { trackingStages as statuses } from "../../fixtures/requests.fixture"
-import LeafletLocationMap from "../../components/LeafletLocationMap"
+import ClientLiveTrackingMap from "../../components/tracking/ClientLiveTrackingMap"
 import { useDispatch } from "../../context/DispatchContext"
+import { useLiveTechnicianTracking } from "../../hooks/useLiveTechnicianTracking"
+import { useData } from "../../context/DataProvider"
 
 interface Props {
   navigate: (s: Screen) => void
@@ -12,8 +14,33 @@ interface Props {
 
 export default function LiveTracking({ navigate }: Props) {
   const { job, setStatus } = useDispatch()
+  const { currentRequest } = useData()
   const tech = useTechnicianProfile(job?.technicianId)
-  const [eta, setEta] = useState(15)
+
+  const clientCoords = useMemo(
+    () => ({
+      latitude: job?.serviceLatitude || 28.608,
+      longitude: job?.serviceLongitude || 77.437,
+    }),
+    [job?.serviceLatitude, job?.serviceLongitude],
+  )
+
+  const {
+    smoothedCoordinates,
+    bearing,
+    roadDistanceKm,
+    etaMinutes: liveEtaMinutes,
+  } = useLiveTechnicianTracking(
+    // Subscribe with the real request (public.requests) when one is active:
+    // DispatchContext's job id is simulated and matches no
+    // technician_locations.request_id.
+    currentRequest?.technician_id ?? job?.technicianId,
+    clientCoords,
+    currentRequest?.id ?? job?.id,
+  )
+
+  const initialEta = 15
+  const [eta, setEta] = useState(12)
   const [progress, setProgress] = useState(0.15)
   const mapRef = useRef<L.Map | null>(null)
   const onMapReady = useCallback((map: L.Map) => {
@@ -72,16 +99,25 @@ export default function LiveTracking({ navigate }: Props) {
     <div className="relative flex h-[calc(100vh-64px)] min-h-0 flex-col overflow-hidden bg-gray-50">
       <div className="relative min-h-0 flex-1">
         <div className="absolute inset-0">
-          <LeafletLocationMap
-            initialAddress={job?.location}
-            activeCoordinates={
-              job?.serviceLatitude && job?.serviceLongitude
-                ? { latitude: job.serviceLatitude, longitude: job.serviceLongitude }
-                : undefined
-            }
-            heightClass="h-full min-h-0"
+          <ClientLiveTrackingMap
+            clientCoordinates={clientCoords}
+            technicianCoordinates={smoothedCoordinates}
+            bearing={bearing}
+            heading={bearing}
+            etaMinutes={liveEtaMinutes > 0 ? liveEtaMinutes : eta}
+            roadDistanceKm={roadDistanceKm > 0 ? roadDistanceKm : undefined}
+            serviceAddress={job?.location}
+            technician={{
+              name: tech.name,
+              photo: tech.photo,
+              phone: tech.phone,
+              rating: typeof tech.rating === 'number' ? tech.rating : parseFloat(String(tech.rating)) || 4.9,
+              vehicle: tech.vehicle,
+              experience: tech.experience,
+            }}
+            requestId={job?.id}
             className="h-full rounded-none border-0"
-            showRoute
+            heightClass="h-full min-h-0"
             onMapReady={onMapReady}
           />
         </div>
@@ -118,7 +154,7 @@ export default function LiveTracking({ navigate }: Props) {
             </div>
             <div className="text-right">
               <div className="font-display font-800 text-xl text-blue-600">
-                {eta} min
+                {liveEtaMinutes > 0 ? liveEtaMinutes : eta} min
               </div>
               <p className="text-xs text-gray-400">ETA</p>
             </div>
@@ -185,14 +221,16 @@ export default function LiveTracking({ navigate }: Props) {
                 <span className="text-amber-400">★</span>
                 <span>{tech.rating}</span>
                 <span>·</span>
-                <span>Electrician</span>
+                <span>{tech.vehicle || 'Electrician'}</span>
               </div>
             </div>
             <div className="text-right">
               <div className="font-display font-800 text-2xl text-blue-600">
-                {eta} min
+                {liveEtaMinutes > 0 ? `${liveEtaMinutes} min` : `${eta} min`}
               </div>
-              <p className="text-xs text-gray-400">{tech.distance}</p>
+              <p className="text-xs text-gray-400">
+                {roadDistanceKm > 0 ? `${roadDistanceKm.toFixed(1)} km away` : tech.distance}
+              </p>
             </div>
           </div>
 
@@ -200,14 +238,14 @@ export default function LiveTracking({ navigate }: Props) {
           <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-5">
             <div
               className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-2000"
-              style={{ width: `${(1 - eta / 15) * 100}%` }}
+              style={{ width: `${(1 - (liveEtaMinutes > 0 ? liveEtaMinutes : eta) / initialEta) * 100}%` }}
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             <button
               onClick={() => navigate("sos-chat")}
-              className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors"
+              className="flex flex-col items-center gap-1.5 py-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors"
             >
               <svg
                 className="w-5 h-5 text-blue-600"
@@ -225,8 +263,8 @@ export default function LiveTracking({ navigate }: Props) {
               <span className="text-xs text-blue-700 font-500">Chat</span>
             </button>
             <a
-              href={`tel:${tech.phone}`}
-              className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 transition-colors"
+              href={`tel:${tech.phone.replace(/[^0-9+]/g, '')}`}
+              className="flex flex-col items-center gap-1.5 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 transition-colors"
             >
               <svg
                 className="w-5 h-5 text-emerald-600"
@@ -243,7 +281,16 @@ export default function LiveTracking({ navigate }: Props) {
               </svg>
               <span className="text-xs text-emerald-700 font-500">Call</span>
             </a>
-            <button className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
+            <a
+              href={`https://wa.me/${tech.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hi ${tech.name}, reaching out regarding my SOS emergency request (${job?.service || 'Service'}) at ${job?.location || 'my address'}.`)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="flex flex-col items-center gap-1.5 py-2.5 rounded-xl bg-green-50 hover:bg-green-100 transition-colors text-center"
+            >
+              <span className="text-base leading-none">🟢</span>
+              <span className="text-xs text-green-700 font-500">WhatsApp</span>
+            </a>
+            <button className="flex flex-col items-center gap-1.5 py-2.5 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
               <svg
                 className="w-5 h-5 text-gray-600"
                 fill="none"

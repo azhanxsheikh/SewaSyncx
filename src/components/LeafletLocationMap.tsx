@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { etaRangeFromCoordinates } from '../lib/eta';
 
 interface Props {
   onLocationChange?: (location: string) => void;
   initialAddress?: string;
   activeCoordinates?: { latitude: number; longitude: number; accuracy?: number };
+  /** Real position when known (see Task 2); falls back to a fixed demo point. */
+  technicianCoordinates?: { latitude: number; longitude: number };
   heightClass?: string;
   className?: string;
   showRoute?: boolean;
@@ -13,8 +16,11 @@ interface Props {
 }
 
 const DEFAULT_LOCATION: L.LatLngExpression = [28.608, 77.437];
+// Used only when technicianCoordinates isn't supplied — a fixed demo point,
+// not a real technician position.
+const DEFAULT_TECH_LOCATION = { latitude: 28.61, longitude: 77.45 };
 
-export default function LeafletLocationMap({ onLocationChange, initialAddress, activeCoordinates, heightClass = 'h-56 min-h-[250px]', className = '', showRoute = false, onMapReady }: Props) {
+export default function LeafletLocationMap({ onLocationChange, initialAddress, activeCoordinates, technicianCoordinates, heightClass = 'h-56 min-h-[250px]', className = '', showRoute = false, onMapReady }: Props) {
   const mapElement = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
@@ -76,7 +82,12 @@ export default function LeafletLocationMap({ onLocationChange, initialAddress, a
       });
     });
     if (showRoute) {
-      const techPoint: L.LatLngExpression = [28.61, 77.45];
+      const techCoords = technicianCoordinates ?? DEFAULT_TECH_LOCATION;
+      const techPoint: L.LatLngExpression = [techCoords.latitude, techCoords.longitude];
+      const [clientLat, clientLng] = activeCoordinates
+        ? [activeCoordinates.latitude, activeCoordinates.longitude]
+        : DEFAULT_LOCATION as [number, number];
+      const { label } = etaRangeFromCoordinates(clientLat, clientLng, techCoords.latitude, techCoords.longitude);
       L.polyline([initialPoint, techPoint], { color: '#2563eb', dashArray: '8 6', weight: 4 }).addTo(map);
       const techMarker = L.marker(techPoint, {
         icon: L.divIcon({
@@ -86,7 +97,7 @@ export default function LeafletLocationMap({ onLocationChange, initialAddress, a
           iconAnchor: [12, 12],
         }),
       }).addTo(map);
-      techMarker.bindTooltip('En-route technician (ETA: 12-17 min)', { direction: 'top' });
+      techMarker.bindTooltip(`En-route technician (${label})`, { direction: 'top' });
       map.fitBounds(L.latLngBounds([initialPoint, techPoint]), { padding: [40, 40] });
     }
 

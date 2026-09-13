@@ -2,8 +2,11 @@ import { useState } from 'react';
 import type { Screen } from '../types/navigation';
 import { bookingFilterTabs as tabs } from '../fixtures/requests.fixture';
 import { useFilteredRequests } from '../hooks/useRequests';
+import { useUnreadNotificationsCount } from '../hooks/useAccount';
 import Header from '../components/Header';
 import BottomNav from '../components/BottomNav';
+import BookingDetailsModal from '../components/BookingDetailsModal';
+import type { BookingRecord } from '../types/domain';
 
 interface Props {
   navigate: (s: Screen) => void;
@@ -11,7 +14,9 @@ interface Props {
 
 export default function BookingHistory({ navigate }: Props) {
   const [activeTab, setActiveTab] = useState('All');
+  const [selectedBooking, setSelectedBooking] = useState<BookingRecord | null>(null);
   const filtered = useFilteredRequests(activeTab);
+  const unreadCount = useUnreadNotificationsCount();
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -19,6 +24,7 @@ export default function BookingHistory({ navigate }: Props) {
         title="My Bookings"
         showNotification
         onNotification={() => navigate('notifications')}
+        unreadCount={unreadCount}
       />
 
       {/* Tabs */}
@@ -104,7 +110,10 @@ export default function BookingHistory({ navigate }: Props) {
                     </button>
                   </>
                 ) : (
-                  <button className="flex-1 py-2.5 rounded-xl bg-blue-50 text-blue-700 font-600 text-sm hover:bg-blue-100 transition-colors">
+                  <button
+                    onClick={() => setSelectedBooking(b)}
+                    className="flex-1 py-2.5 rounded-xl bg-blue-50 text-blue-700 font-600 text-sm hover:bg-blue-100 transition-colors"
+                  >
                     View Details
                   </button>
                 )}
@@ -113,6 +122,12 @@ export default function BookingHistory({ navigate }: Props) {
           ))
         )}
       </div>
+
+      <BookingDetailsModal
+        isOpen={Boolean(selectedBooking)}
+        onClose={() => setSelectedBooking(null)}
+        booking={selectedBooking}
+      />
 
       <BottomNav screen="bookings" navigate={navigate} />
     </div>

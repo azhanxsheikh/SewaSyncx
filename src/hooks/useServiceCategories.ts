@@ -1,15 +1,20 @@
 import { useMemo } from 'react';
-import { scheduledCategories, serviceCategories } from '../fixtures/services.fixture';
+import { scheduledCategories as fixtureScheduledCategories, serviceCategories as fixtureServiceCategories } from '../fixtures/services.fixture';
+import { useData } from '../context/DataProvider';
 import type { ScheduledCategory, ServiceCategory } from '../types/domain';
 
 /**
  * Returns the list of emergency (SOS) service categories.
  *
- * Preserves synchronous contract: returns the list immediately to satisfy the
- * zero-white-screen invariant.
+ * Real query (service_categories has an open SELECT policy for anyone
+ * signed in — see 20260913000002_security_linter_fixes.sql). Falls back to
+ * the fixture list before the initial DataProvider fetch resolves or if the
+ * signed-out preview render needs something to show, preserving the
+ * zero-white-screen contract.
  */
 export function useServiceCategories(): ServiceCategory[] {
-  return serviceCategories;
+  const { ready, serviceCategories } = useData();
+  return ready && serviceCategories.length ? serviceCategories : fixtureServiceCategories;
 }
 
 /**
@@ -17,9 +22,10 @@ export function useServiceCategories(): ServiceCategory[] {
  * the first category (electrical) if not found.
  */
 export function useServiceCategory(categoryId: string): ServiceCategory {
+  const categories = useServiceCategories();
   return useMemo(
-    () => serviceCategories.find((category) => category.id === categoryId) || serviceCategories[0],
-    [categoryId],
+    () => categories.find((category) => category.id === categoryId) || categories[0],
+    [categories, categoryId],
   );
 }
 
@@ -27,5 +33,6 @@ export function useServiceCategory(categoryId: string): ServiceCategory {
  * Returns the list of categories available for scheduled bookings.
  */
 export function useScheduledCategories(): ScheduledCategory[] {
-  return scheduledCategories;
+  const { ready, scheduledCategories } = useData();
+  return ready && scheduledCategories.length ? scheduledCategories : fixtureScheduledCategories;
 }

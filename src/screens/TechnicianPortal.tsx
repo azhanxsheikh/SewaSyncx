@@ -1,44 +1,85 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import TechDashboard from './technician/TechDashboard';
 import IncomingAlert from './technician/IncomingAlert';
 import ActiveJob from './technician/ActiveJob';
 import JobHistory from './technician/JobHistory';
+import TechnicianProfilePage from './technician/TechnicianProfilePage';
 import { useDispatch } from '../context/DispatchContext';
 import { useAuth } from '../context/AuthContext';
+import { useOptionalActiveTechnicianJob } from '../context/ActiveTechnicianJobContext';
 
-type PortalTab = 'dashboard' | 'alerts' | 'active' | 'history';
+type PortalTab = 'dashboard' | 'alerts' | 'active' | 'history' | 'profile';
 
 export default function TechnicianPortal() {
   const [tab, setTab] = useState<PortalTab>('dashboard');
   const { job } = useDispatch();
   const { session, signOut } = useAuth();
+  const refreshJob = useOptionalActiveTechnicianJob()?.refresh;
+
+  // Every tab switch re-reads the technician's request from public.requests,
+  // so Dashboard / Incoming alerts / Active job always render server state.
+  useEffect(() => {
+    void refreshJob?.();
+  }, [tab, refreshJob]);
   const hasAlert = job?.status === 'requested' || job?.status === 'searching';
-  const hasActive = Boolean(job && ['accepted', 'en-route', 'arrived', 'in-progress'].includes(job.status));
+  const hasActive = Boolean(job && ['accepted', 'en-route', 'en_route', 'arrived', 'in-progress', 'in_progress'].includes(job.status));
 
   const content = tab === 'alerts'
     ? <IncomingAlert onAccepted={() => setTab('active')} />
     : tab === 'active'
-    ? <ActiveJob />
+    ? <ActiveJob onOpenAlerts={() => setTab('alerts')} />
     : tab === 'history'
     ? <JobHistory />
+    : tab === 'profile'
+    ? <TechnicianProfilePage />
     : <TechDashboard onOpenAlerts={() => setTab('alerts')} onOpenActive={() => setTab('active')} />;
 
   return (
     <div className="technician-portal min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-800 bg-slate-900/95 px-5 py-4">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500 font-display font-800">SH</div>
-            <div><p className="font-display font-800">Technician Portal</p><p className="text-xs text-slate-400">SOS HomeFix Dispatch</p></div>
+      <header className="border-b border-slate-800 bg-slate-900/95 px-4 sm:px-5 py-3 sm:py-4 sticky top-0 z-40 backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-xl bg-red-500 font-display font-800 text-sm sm:text-base">SH</div>
+            <div className="min-w-0">
+              <p className="font-display font-800 text-sm sm:text-base leading-tight truncate">Technician Portal</p>
+              <p className="text-[10px] sm:text-xs text-slate-400 truncate">SOS HomeFix Dispatch</p>
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-sm"><span className="h-2 w-2 rounded-full bg-emerald-400" /> {session?.user.email ?? 'Technician'} <span className="text-slate-500">|</span> Online <span className="text-slate-500">|</span> <button onClick={() => signOut()} className="text-slate-400 hover:text-white underline">Sign out</button></div>
+          <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm shrink-0">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 shrink-0" />
+            <button
+              type="button"
+              onClick={() => setTab('profile')}
+              className={`hover:text-white transition-colors truncate max-w-[130px] sm:max-w-[160px] ${
+                tab === 'profile' ? 'text-white font-bold underline' : 'text-slate-300'
+              }`}
+              title="Manage Technician Profile"
+            >
+              {session?.user.email ?? 'Profile'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('profile')}
+              className={`hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-colors ${
+                tab === 'profile'
+                  ? 'bg-red-500 text-white font-bold'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <span>👤 Profile</span>
+            </button>
+            <span className="hidden sm:inline text-slate-600">|</span>
+            <span className="text-emerald-400 font-medium">Online</span>
+            <span className="text-slate-600">|</span>
+            <button onClick={() => signOut()} className="text-slate-400 hover:text-white underline text-xs sm:text-sm">Sign out</button>
+          </div>
         </div>
       </header>
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-6 lg:flex-row">
-        <nav className="flex shrink-0 gap-2 overflow-x-auto lg:w-52 lg:flex-col">
-          {(['dashboard', 'alerts', 'active', 'history'] as PortalTab[]).map(item => (
+      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 sm:px-5 py-6 lg:flex-row">
+        <nav className="flex shrink-0 gap-2 overflow-x-auto pb-1 lg:pb-0 lg:w-52 lg:flex-col scrollbar-none">
+          {(['dashboard', 'alerts', 'active', 'history', 'profile'] as PortalTab[]).map(item => (
             <button key={item} onClick={() => setTab(item)} className={`flex items-center justify-between whitespace-nowrap rounded-xl px-4 py-3 text-left text-sm font-600 capitalize transition-colors ${tab === item ? 'bg-red-500 text-white' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'}`}>
-              {item === 'alerts' ? 'Incoming alerts' : item === 'active' ? 'Active job' : item}
+              {item === 'alerts' ? 'Incoming alerts' : item === 'active' ? 'Active job' : item === 'profile' ? 'Profile & skills' : item}
               {item === 'alerts' && hasAlert && <span className="rounded-full bg-white px-2 py-0.5 text-xs text-red-600">1</span>}
               {item === 'active' && hasActive && <span className="h-2 w-2 rounded-full bg-emerald-400" />}
             </button>
@@ -49,3 +90,4 @@ export default function TechnicianPortal() {
     </div>
   );
 }
+

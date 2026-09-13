@@ -1,9 +1,14 @@
+import { useState } from 'react';
 import type { Screen } from '../types/navigation';
 import { accountMenuItems, supportMenuItems } from '../fixtures/account.fixture';
-import { useClientProfile, useClientStats, useSavedAddresses } from '../hooks/useAccount';
+import { useClientProfile, useClientStats, useSavedAddresses, useUnreadNotificationsCount } from '../hooks/useAccount';
 import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataProvider';
 import Header from '../components/Header';
 import BottomNav from '../components/BottomNav';
+import EditProfileModal from '../components/profile/EditProfileModal';
+import AddressModal from '../components/profile/AddressModal';
+import type { SavedAddress } from '../types/domain';
 
 interface Props {
   navigate: (s: Screen) => void;
@@ -11,13 +16,24 @@ interface Props {
 
 export default function Profile({ navigate }: Props) {
   const { signOut } = useAuth();
+  const { refreshClientData } = useData();
   const profile = useClientProfile();
   const stats = useClientStats();
   const savedAddresses = useSavedAddresses();
+  const unreadCount = useUnreadNotificationsCount();
+
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState<SavedAddress | null>(null);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      <Header title="Profile" showNotification onNotification={() => navigate('notifications')} />
+      <Header
+        title="Profile"
+        showNotification
+        onNotification={() => navigate('notifications')}
+        unreadCount={unreadCount}
+      />
 
       <div className="max-w-md mx-auto px-4 pt-4 space-y-4">
         {/* Profile card */}
@@ -31,7 +47,11 @@ export default function Profile({ navigate }: Props) {
               <p className="text-sm text-gray-500">{profile.phone}</p>
               <p className="text-sm text-gray-500">{profile.email}</p>
             </div>
-            <button className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors">
+            <button
+              onClick={() => setIsEditProfileOpen(true)}
+              className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors"
+              aria-label="Edit Profile"
+            >
               <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
@@ -48,7 +68,7 @@ export default function Profile({ navigate }: Props) {
               <p className="text-xs text-gray-500">SOS used</p>
             </div>
             <div className="text-center">
-              <p className="font-display font-800 text-2xl text-gray-900">{stats.averageRating}</p>
+              <p className="font-display font-800 text-2xl text-gray-900">{stats.averageRating ? stats.averageRating.toFixed(1) : '5.0'}</p>
               <p className="text-xs text-gray-500">Avg rating</p>
             </div>
           </div>
@@ -58,7 +78,15 @@ export default function Profile({ navigate }: Props) {
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
           <div className="px-4 pt-4 pb-2 flex items-center justify-between">
             <p className="font-display font-700 text-gray-900">Saved Addresses</p>
-            <button className="text-blue-600 text-xs font-600 hover:underline">+ Add</button>
+            <button
+              onClick={() => {
+                setSelectedAddress(null);
+                setIsAddressModalOpen(true);
+              }}
+              className="text-blue-600 text-xs font-600 hover:underline"
+            >
+              + Add
+            </button>
           </div>
           {savedAddresses.map((addr, i) => (
             <div key={addr.id} className={`px-4 py-3 flex items-center gap-3 ${i < savedAddresses.length - 1 ? 'border-b border-gray-50' : ''}`}>
@@ -68,7 +96,14 @@ export default function Profile({ navigate }: Props) {
                 <p className="text-xs text-gray-500 truncate">{addr.address}</p>
                 <p className="text-xs text-gray-400">{addr.area}</p>
               </div>
-              <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-400">
+              <button
+                onClick={() => {
+                  setSelectedAddress(addr);
+                  setIsAddressModalOpen(true);
+                }}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-400"
+                aria-label={`Edit ${addr.label} address`}
+              >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
@@ -118,14 +153,6 @@ export default function Profile({ navigate }: Props) {
           ))}
         </div>
 
-        {/* Admin Console */}
-        <button
-          onClick={() => navigate('admin')}
-          className="w-full py-3.5 rounded-2xl border border-gray-100 bg-white text-blue-600 font-600 text-sm hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
-        >
-          <span>🛡️</span>
-          <span>Admin Operations Console</span>
-        </button>
 
         {/* Logout */}
         <button
@@ -135,6 +162,24 @@ export default function Profile({ navigate }: Props) {
           Sign Out
         </button>
       </div>
+
+      <EditProfileModal
+        isOpen={isEditProfileOpen}
+        onClose={() => setIsEditProfileOpen(false)}
+        currentName={profile.name}
+        currentPhone={profile.phone}
+        onUpdated={() => void refreshClientData()}
+      />
+
+      <AddressModal
+        isOpen={isAddressModalOpen}
+        onClose={() => {
+          setIsAddressModalOpen(false);
+          setSelectedAddress(null);
+        }}
+        address={selectedAddress}
+        onSaved={() => void refreshClientData()}
+      />
 
       <BottomNav screen="profile" navigate={navigate} />
     </div>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 
@@ -6,6 +6,8 @@ interface Props {
   serviceLatitude?: number
   serviceLongitude?: number
   serviceAddress: string
+  mode?: "preview" | "active"
+  destinationLabel?: string
 }
 
 type Route = { coordinates: L.LatLngExpression[]; distance: number; duration: number }
@@ -13,7 +15,13 @@ type Status = "idle" | "locating" | "routing" | "success" | "error"
 
 const OSRM_URL = "https://router.project-osrm.org/route/v1/driving"
 
-export default function TechnicianDirectionsMap({ serviceLatitude, serviceLongitude, serviceAddress }: Props) {
+export default function TechnicianDirectionsMap({
+  serviceLatitude,
+  serviceLongitude,
+  serviceAddress,
+  mode = "active",
+  destinationLabel,
+}: Props) {
   const mapElement = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const routeRef = useRef<L.Polyline | null>(null)
@@ -24,36 +32,54 @@ export default function TechnicianDirectionsMap({ serviceLatitude, serviceLongit
   const [technicianPosition, setTechnicianPosition] = useState<GeolocationPosition | null>(null)
   const [route, setRoute] = useState<Route | null>(null)
   const [error, setError] = useState("")
-  const serviceCoordinates = serviceLatitude !== undefined && serviceLongitude !== undefined
-    ? [serviceLatitude, serviceLongitude] as L.LatLngExpression
-    : null
+  // Memoised on the numbers: a fresh array each render would re-run the
+  // map-creation effect below (it depends on this), destroying and rebuilding
+  // the Leaflet map on every parent re-render.
+  const serviceCoordinates = useMemo(
+    () => serviceLatitude !== undefined && serviceLongitude !== undefined
+      ? [serviceLatitude, serviceLongitude] as L.LatLngExpression
+      : null,
+    [serviceLatitude, serviceLongitude],
+  )
 
   useEffect(() => {
     if (!mapElement.current || mapRef.current) return
-    const map = L.map(mapElement.current, { zoomControl: false }).setView([28.608, 77.437], 13)
+    const defaultCenter: [number, number] = serviceCoordinates
+      ? [serviceLatitude!, serviceLongitude!]
+      : [28.608, 77.437]
+    // Preview opens at its final zoom. Created at 13, the marker effect's
+    // setView(…, 14) started a 250 ms zoom animation whose timer Leaflet 1.9
+    // does not cancel on remove(): closing the drawer inside that window (an
+    // alert claimed elsewhere, a quick accept) threw `_leaflet_pos` errors.
+    const map = L.map(mapElement.current, { zoomControl: false }).setView(defaultCenter, mode === "preview" ? 14 : 13)
     L.control.zoom({ position: "bottomright" }).addTo(map)
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "&copy; OpenStreetMap contributors",
       maxZoom: 19,
     }).addTo(map)
     mapRef.current = map
-    window.setTimeout(() => map.invalidateSize(), 0)
+    const sizeTimer = window.setTimeout(() => map.invalidateSize(), 0)
     return () => {
+      window.clearTimeout(sizeTimer)
       map.remove()
       mapRef.current = null
     }
-  }, [serviceLatitude, serviceLongitude])
+  }, [serviceLatitude, serviceLongitude, serviceCoordinates, mode])
 
   useEffect(() => {
     if (!mapRef.current || !serviceCoordinates) return
     serviceMarkerRef.current?.remove()
+    const tooltipText = destinationLabel || "Service destination"
     serviceMarkerRef.current = L.marker(serviceCoordinates, { icon: createIcon("#dc2626") }).addTo(mapRef.current)
-      .bindTooltip("Service address", { direction: "top" })
-  }, [serviceLatitude, serviceLongitude, serviceCoordinates])
+      .bindTooltip(tooltipText, { direction: "top", permanent: mode === "preview" })
+    if (mode === "preview") {
+      mapRef.current.setView(serviceCoordinates, 14)
+    }
+  }, [serviceLatitude, serviceLongitude, serviceCoordinates, destinationLabel, mode])
 
   const openInMapsUrl = serviceLatitude !== undefined && serviceLongitude !== undefined
-    ? `https://www.google.com/maps/dir/?api=1&destination=${serviceLatitude},${serviceLongitude}`
-    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(serviceAddress)}`
+    ? `https://www.google.com/maps/dir/?api=1&destination=${serviceLatitude},${serviceLongitude}&travelmode=two_wheeler`
+    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(serviceAddress)}&travelmode=two_wheeler`
 
   const requestRoute = () => {
     if (serviceLatitude === undefined || serviceLongitude === undefined) {
@@ -123,24 +149,63 @@ export default function TechnicianDirectionsMap({ serviceLatitude, serviceLongit
 
   return (
     <section className="mt-4 rounded-2xl border border-gray-100 bg-white p-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="font-display font-700 text-gray-900">Directions to client</h2>
-          {route && <p className="mt-1 text-xs text-gray-500">{distance} · about {duration}</p>}
+          <h2 className="font-display font-700 text-gray-900">
+            {destinationLabel ? destinationLabel : mode === "preview" ? "Service location context" : "Directions to client"}
+          </h2>
+          {mode === "active" && route ? (
+            <p className="mt-1 text-xs text-gray-500">{distance} · about {duration}</p>
+          ) : (
+            <p className="mt-1 text-xs text-gray-500">{mode === "preview" ? "Static context · Navigation locked" : serviceAddress}</p>
+          )}
         </div>
-        <button type="button" onClick={requestRoute} disabled={serviceCoordinates === null || status === "locating" || status === "routing"} className="rounded-xl bg-red-500 px-3 py-2 text-sm font-700 text-white disabled:cursor-not-allowed disabled:opacity-60">
-          {status === "locating" ? "Locating..." : status === "routing" ? "Routing..." : route ? "Refresh route" : "Get Directions"}
-        </button>
+
+        {mode === "preview" ? (
+          <button
+            type="button"
+            disabled
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-200 px-4 py-2.5 text-xs font-bold text-slate-400 cursor-not-allowed border border-slate-300/60 shrink-0"
+            title="Navigation is locked until the emergency job is accepted"
+          >
+            <span>🔒</span>
+            <span>Get Directions</span>
+          </button>
+        ) : (
+          <a
+            href={openInMapsUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 px-4 py-2.5 text-sm font-bold text-white shadow-md shadow-emerald-600/20 transition-all shrink-0"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span>Get Directions</span>
+          </a>
+        )}
       </div>
+
       {serviceCoordinates && <div ref={mapElement} className="mt-3 h-56 w-full overflow-hidden rounded-xl bg-gray-100" />}
       {serviceCoordinates === null && <p className="mt-3 text-sm text-gray-500">We couldn't locate this service address. Directions are unavailable for this job.</p>}
-      {serviceCoordinates === null && <a href={openInMapsUrl} target="_blank" rel="noreferrer" className="mt-3 block rounded-xl bg-gray-900 px-4 py-3 text-center text-sm font-700 text-white">Open in Maps</a>}
       {status === "error" && <p className="mt-3 text-sm text-red-600">{error}</p>}
-      {status === "error" && serviceCoordinates !== null && <a href={openInMapsUrl} target="_blank" rel="noreferrer" className="mt-3 block rounded-xl bg-gray-900 px-4 py-3 text-center text-sm font-700 text-white">Open in Maps</a>}
-      {status === "success" && <a href={openInMapsUrl} target="_blank" rel="noreferrer" className="mt-3 block text-center text-sm font-600 text-blue-600">Open in Maps for turn-by-turn navigation</a>}
+      {mode === "active" && serviceCoordinates !== null && !route && (
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            onClick={requestRoute}
+            disabled={status === "locating" || status === "routing"}
+            className="text-xs text-blue-600 hover:underline font-semibold"
+          >
+            {status === "locating" ? "Locating..." : status === "routing" ? "Routing..." : "Preview in-app route polyline"}
+          </button>
+        </div>
+      )}
     </section>
   )
 }
+
 
 function createIcon(color: string) {
   return L.divIcon({

@@ -3,7 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "PORT=3003 vite --config ../../vite.config.ts",
-    "build": "vite build --config ../../vite.config.ts"
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@sewasync/shared": "workspace:*"
   }
 }

@@ -71,11 +71,10 @@ Vite would need to reconcile, which is exactly the ambiguity
 
 ## Known gaps
 
-- **The Admin build only requires *a* Supabase session, not a staff one.**
-  `src/App.tsx` now gates the admin target behind `AuthContext` (any signed-in
-  user, including an ordinary client), pending the `platform_staff` table and
-  a real staff-role check. Until that lands, use Vercel Deployment Protection
-  (above) as the real access control for this project.
+- **The Admin build now requires a real `platform_staff` row**, not just any
+  Supabase session — `src/App.tsx` checks `staffRole` from `AuthContext` and
+  shows "Not authorised" for a signed-in client/technician. Vercel Deployment
+  Protection (above) is still worth keeping as a second layer.
 - **`AdminDashboard`'s "Exit Console" button is inert on this deployment.**
   It's wired to a `navigate` callback that only makes sense inside the
   client screen router (see the comment in `src/App.tsx` above the

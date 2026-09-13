@@ -9,4 +9,10 @@ interface ImportMetaEnv {
    * regardless of which port it's running on.
    */
   readonly VITE_APP_TARGET?: 'client' | 'admin';
+  /**
+   * Start of the technician's simulated route when localhost has no GPS
+   * (apps/technician useTechnicianBroadcaster). Defaults to Gaur City.
+   */
+  readonly VITE_DEV_TECH_LAT?: string;
+  readonly VITE_DEV_TECH_LNG?: string;
 }
