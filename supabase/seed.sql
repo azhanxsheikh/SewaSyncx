@@ -3,15 +3,24 @@
 --
 -- Applied by `supabase db reset` after all migrations. Local development only.
 --
--- Logins (email + password, all accounts):  password  SewaSync@2026
---   Client      Abdullah        abdullah@sewasync.test       +919876543210
---   Technician  Amit Singh      amit.singh@sewasync.test     +919876543211
---   Technician  Rahul Kumar     rahul.kumar@sewasync.test    +919876543212
---   Technician  Vikram Sharma   vikram.sharma@sewasync.test  +919876543213
+-- Logins (email + password):                                     password
+--   Client      Abdullah Sheikh  abdullah@sewasync.in     +919876543210   Password@123
+--   Technician  Amit Singh       amit.singh@sewasync.in   +919811223344   Password@123
+--   Technician  Rahul Kumar      rahul.kumar@sewasync.in  +919822334455   Password@123
+--   Technician  Vikram Sharma    vikram.sharma@sewasync.in +919876543213  Password@123
 --
--- Scenarios (all for Abdullah, B-204 Gaur City 2):
+-- Vikram isn't a named persona in the current spec, but is kept (same domain
+-- and password as everyone else) — he's the idle technician the security
+-- test harness and the demo script's RLS check both rely on.
+--
+-- Admin (super_admin) isn't seeded here: it needs the platform_staff table,
+-- which doesn't exist yet — public.users has no admin role, by design (see
+-- docs/DATABASE.md's rationale for keeping staff out of the shared users
+-- table). Lands with that migration.
+--
+-- Scenarios (all for Abdullah, Flat 402, Tower B, Gaur City 2):
 --   A  pending   Plumbing SOS "Washroom pipe burst", high priority → Amit is the match
---   B  en_route  AC Repair, assigned to Rahul Kumar (live tracking / deep link)
+--   B  en_route  AC Repair, assigned to Rahul Kumar — "Request #2" in the task spec
 --   C  completed Plumbing, Amit Singh, yesterday: photos, ₹648 settlement, 5★ review
 --
 -- Coordinates are approximate locality centroids.
@@ -47,15 +56,15 @@ insert into auth.users (
   email_change_token_current, phone_change, phone_change_token, reauthentication_token
 )
 select '00000000-0000-0000-0000-000000000000', u.id, 'authenticated', 'authenticated', u.email,
-       extensions.crypt('SewaSync@2026', extensions.gen_salt('bf')), now(),
+       extensions.crypt('Password@123', extensions.gen_salt('bf')), now(),
        u.phone, now(), '{"provider": "email", "providers": ["email"]}'::jsonb,
        jsonb_build_object('name', u.name), now(), now(),
        '', '', '', '', '', '', '', ''
   from (values
-    ('11111111-1111-4111-8111-111111111111'::uuid, 'abdullah@sewasync.test',      '919876543210', 'Abdullah'),
-    ('22222222-2222-4222-8222-222222222201'::uuid, 'amit.singh@sewasync.test',    '919876543211', 'Amit Singh'),
-    ('22222222-2222-4222-8222-222222222202'::uuid, 'rahul.kumar@sewasync.test',   '919876543212', 'Rahul Kumar'),
-    ('22222222-2222-4222-8222-222222222203'::uuid, 'vikram.sharma@sewasync.test', '919876543213', 'Vikram Sharma')
+    ('11111111-1111-4111-8111-111111111111'::uuid, 'abdullah@sewasync.in',      '919876543210', 'Abdullah Sheikh'),
+    ('22222222-2222-4222-8222-222222222201'::uuid, 'amit.singh@sewasync.in',    '919811223344', 'Amit Singh'),
+    ('22222222-2222-4222-8222-222222222202'::uuid, 'rahul.kumar@sewasync.in',   '919822334455', 'Rahul Kumar'),
+    ('22222222-2222-4222-8222-222222222203'::uuid, 'vikram.sharma@sewasync.in', '919876543213', 'Vikram Sharma')
   ) u(id, email, phone, name);
 
 insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
@@ -63,18 +72,19 @@ select gen_random_uuid(), u.id, u.id::text,
        jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true, 'phone_verified', false),
        'email', now(), now(), now()
   from auth.users u
- where u.email like '%@sewasync.test';
+ where u.email like '%@sewasync.in';
 
 update public.users
    set preferred_language     = 'hi-IN',
-       default_location       = st_point(77.4368, 28.6175, 4326)::geography,
-       default_street_address = 'B-204, Gaur City 2',
-       default_unit_floor     = '2nd floor'
+       default_location       = st_point(77.4267, 28.6083, 4326)::geography,
+       default_street_address = 'Flat 402, Tower B, Gaur City 2',
+       default_unit_floor     = '4th floor'
  where id = '11111111-1111-4111-8111-111111111111';
 
 insert into public.saved_addresses (id, user_id, label, icon, address_line, area, location, is_default)
 values ('5a5a5a5a-0000-4000-8000-000000000001', '11111111-1111-4111-8111-111111111111', 'Home', '🏠',
-        'B-204, Gaur City 2', 'Greater Noida West', st_point(77.4368, 28.6175, 4326)::geography, true);
+        'Flat 402, Tower B, Gaur City 2', 'Greater Noida West, UP 201009',
+        st_point(77.4267, 28.6083, 4326)::geography, true);
 
 
 -- -----------------------------------------------------------------------------
@@ -95,21 +105,23 @@ values
 insert into public.technician_categories (technician_id, category_id)
 select t.id::uuid, c.id
   from (values
+    -- Amit: Plumbing, Electrical (max 2 categories, per spec).
     ('22222222-2222-4222-8222-222222222201', 'plumbing'),
     ('22222222-2222-4222-8222-222222222201', 'electrical'),
+    -- Rahul: Plumbing, AC Repair.
     ('22222222-2222-4222-8222-222222222202', 'plumbing'),
     ('22222222-2222-4222-8222-222222222202', 'ac'),
-    ('22222222-2222-4222-8222-222222222202', 'appliance'),
     ('22222222-2222-4222-8222-222222222203', 'electrical'),
     ('22222222-2222-4222-8222-222222222203', 'carpenter')
   ) t(id, slug)
   join public.service_categories c on c.slug = t.slug;
 
 -- Current positions, fresh at seed time (the matching RPC requires < 90 s).
+-- st_point(lng, lat, srid) — the spec states coordinates as (lat, lng).
 insert into public.technician_locations (technician_id, location, heading, speed) values
-  ('22222222-2222-4222-8222-222222222201', st_point(77.4402, 28.6139, 4326)::geography, null, null),  -- Gaur City 2
-  ('22222222-2222-4222-8222-222222222202', st_point(77.4880, 28.4744, 4326)::geography, 340,  8.3),   -- Knowledge Park III
-  ('22222222-2222-4222-8222-222222222203', st_point(77.5118, 28.4712, 4326)::geography, null, null);  -- Alpha 1
+  ('22222222-2222-4222-8222-222222222201', st_point(77.4320, 28.6105, 4326)::geography, null, null),  -- Near Gaur City 1, ~1.2 km from Abdullah
+  ('22222222-2222-4222-8222-222222222202', st_point(77.4893, 28.4727, 4326)::geography, 340,  8.3),   -- Knowledge Park III
+  ('22222222-2222-4222-8222-222222222203', st_point(77.5118, 28.4712, 4326)::geography, null, null);  -- Alpha 1 (unchanged)
 
 
 -- -----------------------------------------------------------------------------
@@ -136,7 +148,7 @@ begin
   values
     (c_req, c_client, '5a5a5a5a-0000-4000-8000-000000000001',
      (select id from public.service_categories where slug = 'plumbing'), 'medium',
-     st_point(77.4368, 28.6175, 4326)::geography, 'B-204, Gaur City 2', 'Greater Noida West',
+     st_point(77.4267, 28.6083, 4326)::geography, 'Flat 402, Tower B, Gaur City 2', 'Greater Noida West, UP 201009',
      'Kitchen sink pipe leaking under the counter', array['Water leakage', 'Dripping joint'], 598);
 
   perform set_config('request.jwt.claims', json_build_object('sub', c_amit, 'role', 'authenticated')::text, true);
@@ -197,10 +209,10 @@ begin
   values
     ('c0ffee00-0000-4000-8000-000000000001', c_req, 'image', 'pre_work',
      'cccccccc-0000-4000-8000-00000000000c/c0ffee00-0000-4000-8000-000000000001.png', 'sink-leak-before.png',
-     28.6175, 77.4368, t0 - interval '2 minutes', c_client, t0),
+     28.6083, 77.4267, t0 - interval '2 minutes', c_client, t0),
     ('c0ffee00-0000-4000-8000-000000000002', c_req, 'image', 'post_work',
      'cccccccc-0000-4000-8000-00000000000c/c0ffee00-0000-4000-8000-000000000002.png', 'sink-fixed-after.png',
-     28.6175, 77.4368, t0 + interval '66 minutes', c_amit, t0 + interval '67 minutes');
+     28.6083, 77.4267, t0 + interval '66 minutes', c_amit, t0 + interval '67 minutes');
 end;
 $$;
 
@@ -221,7 +233,7 @@ begin
   values
     (c_req, c_client, '5a5a5a5a-0000-4000-8000-000000000001',
      (select id from public.service_categories where slug = 'ac'), 'medium',
-     st_point(77.4368, 28.6175, 4326)::geography, 'B-204, Gaur City 2', 'Greater Noida West',
+     st_point(77.4267, 28.6083, 4326)::geography, 'Flat 402, Tower B, Gaur City 2', 'Greater Noida West, UP 201009',
      'Bedroom split AC blowing warm air', array['Not cooling', 'Warm air'], 798);
 
   perform set_config('request.jwt.claims', json_build_object('sub', c_rahul, 'role', 'authenticated')::text, true);
@@ -258,5 +270,5 @@ insert into public.requests
 values
   ('aaaaaaaa-0000-4000-8000-00000000000a', '11111111-1111-4111-8111-111111111111', '5a5a5a5a-0000-4000-8000-000000000001',
    (select id from public.service_categories where slug = 'plumbing'), 'high',
-   st_point(77.4368, 28.6175, 4326)::geography, 'B-204, Gaur City 2', 'Greater Noida West',
+   st_point(77.4267, 28.6083, 4326)::geography, 'Flat 402, Tower B, Gaur City 2', 'Greater Noida West, UP 201009',
    'Washroom pipe burst', array['Pipe burst', 'Water on floor'], 598);
