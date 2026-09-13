@@ -117,8 +117,10 @@ insert into public.technician_locations (technician_id, location, heading, speed
 --
 -- Walked through the real lifecycle RPCs as Amit, so the status timeline,
 -- dispatch snapshot and job count are produced by the same code the app uses,
--- then backdated. Settlement is written directly: settle_job_payment() and
--- invoice generation are not built yet.
+-- then backdated. Settlement is written directly rather than through
+-- settle_job_payment() (20260913000004_settle_job_rpc.sql), since that
+-- function timestamps and numbers the invoice at call time and this
+-- scenario needs specific backdated values instead.
 -- -----------------------------------------------------------------------------
 
 do $$

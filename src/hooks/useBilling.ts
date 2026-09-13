@@ -14,6 +14,7 @@ import type {
   PaymentMethodOption,
 } from '../types/domain';
 import type { DispatchJob } from '../types/dispatch';
+import { getBaseServicePrice, getSosFeeForPriority } from '../lib/pricing';
 
 /**
  * Returns available payment methods.
@@ -49,8 +50,8 @@ export function useInvoiceDetails(job?: DispatchJob | null): {
   }
 
   const priority = (job.priority ?? 'medium').toLowerCase();
-  const sosFee = priority === 'high' ? 249 : priority === 'low' ? 49 : 149;
-  const baseServicePrice = 499;
+  const sosFee = getSosFeeForPriority(priority);
+  const baseServicePrice = getBaseServicePrice();
   const settledTotal = job.finalPrice ?? job.estimatedTotal ?? (baseServicePrice + sosFee);
   const serviceName = job.service
     ? job.service
@@ -72,14 +73,16 @@ export function useInvoiceDetails(job?: DispatchJob | null): {
 
   const variance = settledTotal - (baseServicePrice + sosFee);
   if (variance !== 0) {
+    // Mirrors the database enum public.price_adjustment_reason.
     const reasonLabels: Record<string, string> = {
-      standard_quote: 'Standard quote adjustment',
-      additional_parts_replaced: 'On-site parts replacement',
-      unforeseen_complexity: 'Unforeseen complexity surcharge',
-      extended_labor_hours: 'Extended labor hours',
-      emergency_surcharge: 'Emergency on-site surcharge',
+      additional_parts: 'On-site parts replacement',
+      additional_labor_time: 'Additional labor time',
+      access_difficulty: 'Access difficulty surcharge',
+      misdiagnosis_correction: 'Misdiagnosis correction',
+      customer_requested_scope_change: 'Customer-requested scope change',
+      other: 'Other adjustment',
     };
-    const reasonKey = job.priceAdjustmentReason ?? 'additional_parts_replaced';
+    const reasonKey = job.priceAdjustmentReason ?? 'additional_parts';
     const reasonLabel = reasonLabels[reasonKey] ?? reasonKey.replace(/_/g, ' ');
     const desc = job.priceAdjustmentNotes
       ? `${reasonLabel} (${job.priceAdjustmentNotes})`

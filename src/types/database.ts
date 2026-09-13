@@ -1139,6 +1139,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      settle_job_payment: {
+        Args: {
+          p_final_price: number
+          p_notes?: string
+          p_reason?: Database["public"]["Enums"]["price_adjustment_reason"]
+          p_request_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       actor_role: "client" | "technician" | "system" | "admin"

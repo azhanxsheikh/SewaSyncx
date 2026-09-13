@@ -18,6 +18,7 @@ import type {
   TechnicianProfile,
 } from "../types/dispatch"
 import { forwardGeocode } from "../utils/geocoding"
+import { estimateJobTotal } from "../lib/pricing"
 import { defaultConfirmedLocation } from "../fixtures/account.fixture"
 import { acceptRequestRpc } from "../lib/supabase"
 
@@ -340,7 +341,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
         serviceLatitude: input.serviceLatitude,
         serviceLongitude: input.serviceLongitude,
         searchRadiusKm: 10,
-        estimatedTotal: 648,
+        estimatedTotal: estimateJobTotal(input.service, input.priority ?? "medium"),
         createdAt: Date.now(),
         updatedAt: Date.now(),
         status: "requested",
