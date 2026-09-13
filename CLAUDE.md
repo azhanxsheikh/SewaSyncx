@@ -12,7 +12,7 @@ Operational guide for working in this repository. Read this before making change
 
 - A **single Vite + React 19 SPA** rooted at `src/`.
 - `apps/clients` and `apps/technician` are **thin mount wrappers** (~10 lines each). They mount `src/App.tsx` and `src/screens/TechnicianPortal.tsx` respectively against the same shared `src/` tree. They are *not* independent applications.
-- Cross-surface state is simulated client-side by `src/context/DispatchContext.tsx` using `BroadcastChannel`, a `localStorage` mirror, and a 1-second poll against a dev-only bridge at `localhost:3000/__sos_dispatch`.
+- Cross-surface state is simulated client-side by `src/context/DispatchContext.tsx` using `BroadcastChannel`, a `localStorage` mirror, and a 1-second poll against a dev-only bridge at `localhost:3003/__sos_dispatch`.
 - **There is no backend.** No Supabase client, no authentication, no persistence. All data comes from typed fixtures under `src/fixtures/`.
 - Geocoding calls public Nominatim directly from the browser; routing uses the public OSRM demo server. Both are prototype-only and must be proxied before production.
 
@@ -35,7 +35,7 @@ Package manager is **pnpm** (see `.mise.toml`: Node 22, pnpm 10.34.3).
 | Command | Purpose |
 |---|---|
 | `pnpm install` | Install dependencies |
-| `pnpm dev` | Run both surfaces in parallel (clients on :3002, technician on :3000) |
+| `pnpm dev` | Run both surfaces in parallel (clients on :3002, technician on :3003) |
 | `pnpm dev:client` | Run the client surface only |
 | `pnpm build` | Production build via Vite — **must exit 0 before and after every change** |
 | `pnpm preview` | Serve the production build locally |
@@ -55,7 +55,7 @@ There is no test runner and no linter configured. Do not reference `pnpm test` o
 ├── docs/                        # Architecture & design specifications (see §5)
 ├── apps/
 │   ├── clients/                 # Thin mount wrapper → src/App.tsx (port 3002)
-│   └── technician/              # Thin mount wrapper → src/screens/TechnicianPortal.tsx (port 3000)
+│   └── technician/              # Thin mount wrapper → src/screens/TechnicianPortal.tsx (port 3003)
 ├── src/
 │   ├── App.tsx                  # In-memory screen router for the client surface
 │   ├── main.tsx                 # Root Vite entry (build entrypoint via index.html)
@@ -191,5 +191,5 @@ Pre-existing, deliberately left in place (fixing them requires product decisions
 - Unused locals: `goBack` (App), `taxes` (ScheduledBooking), `progress` (LiveTracking), `priorityMultiplier` (Pricing), `currentStage` (ServiceInProgress). `pnpm type-check --noUnusedLocals` lists them.
 - Unused props: `onBack` (FamilySOS), `navigate` (Notifications), `selectedService` (PriorityTriage).
 - `request_answers` has a schema and fixtures, but `Questionnaire.tsx` still discards its answers in local state — they never reach `DispatchContext`. Wiring required.
-- The dev bridge (`localhost:3000/__sos_dispatch`) is prototype transport and disappears with Supabase Realtime.
+- The dev bridge (`localhost:3003/__sos_dispatch`) is prototype transport and disappears with Supabase Realtime.
 - Public Nominatim / OSRM endpoints have no SLA or rate limiting; proxy before production.

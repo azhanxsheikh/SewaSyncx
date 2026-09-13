@@ -24,7 +24,7 @@ import { acceptRequestRpc } from "../lib/supabase"
 const CHANNEL_NAME = "sos-dispatch"
 const STORAGE_KEY = "sos-dispatch-job"
 const EVENT_KEY = "sos-dispatch-event"
-const DISPATCH_BRIDGE_URL = "http://localhost:3000/__sos_dispatch"
+const DISPATCH_BRIDGE_URL = "http://localhost:3003/__sos_dispatch"
 
 function canUseDispatchBridge() {
   return (

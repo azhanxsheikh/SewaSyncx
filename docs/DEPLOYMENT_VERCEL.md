@@ -14,7 +14,7 @@ comment for the full precedence (env var → dev-server port → `/admin` path
 prefix → default `client`).
 
 `pnpm dev` runs Client + Admin together via `concurrently`. The Technician
-surface (`apps/technician`, port 3000) is untouched by this split — run it
+surface (`apps/technician`, port 3003) is untouched by this split — run it
 with `pnpm dev:technician`, or all three with `pnpm dev:all`.
 
 ## Two Vercel projects, one repository
