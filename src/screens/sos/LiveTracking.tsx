@@ -1,19 +1,37 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type L from "leaflet"
 import type { Screen } from "../../types/navigation"
 import { useTechnicianProfile } from "../../hooks/useTechnicians"
 import { trackingStages as statuses } from "../../fixtures/requests.fixture"
 import LeafletLocationMap from "../../components/LeafletLocationMap"
 import { useDispatch } from "../../context/DispatchContext"
+import { estimateEtaMinutes, haversineDistanceKm } from "../../lib/eta"
 
 interface Props {
   navigate: (s: Screen) => void
 }
 
+// Matches LeafletLocationMap's own fallback — a fixed demo point, not a real
+// technician position (see Task 2 for live tracking).
+const DEFAULT_TECH_LOCATION = { latitude: 28.61, longitude: 77.45 }
+
 export default function LiveTracking({ navigate }: Props) {
   const { job, setStatus } = useDispatch()
   const tech = useTechnicianProfile(job?.technicianId)
-  const [eta, setEta] = useState(15)
+  const initialEta = useMemo(() => {
+    if (!job?.serviceLatitude || !job?.serviceLongitude) return 15
+    const distanceKm = haversineDistanceKm(
+      job.serviceLatitude,
+      job.serviceLongitude,
+      DEFAULT_TECH_LOCATION.latitude,
+      DEFAULT_TECH_LOCATION.longitude,
+    )
+    return estimateEtaMinutes(distanceKm)
+    // Computed once at mount, matching the original static useState(15) —
+    // the countdown below still owns ticking it down from there.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const [eta, setEta] = useState(initialEta)
   const [progress, setProgress] = useState(0.15)
   const mapRef = useRef<L.Map | null>(null)
   const onMapReady = useCallback((map: L.Map) => {
@@ -200,7 +218,7 @@ export default function LiveTracking({ navigate }: Props) {
           <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-5">
             <div
               className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-2000"
-              style={{ width: `${(1 - eta / 15) * 100}%` }}
+              style={{ width: `${(1 - eta / initialEta) * 100}%` }}
             />
           </div>
 
