@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Screen } from '../../types/navigation';
 import { useOptionalDispatch } from '../../context/DispatchContext';
+import { useAuth } from '../../context/AuthContext';
+import { useData } from '../../context/DataProvider';
+import { supabase } from '../../lib/supabaseClient';
 
 interface Props {
   navigate: (s: Screen) => void;
@@ -10,6 +13,8 @@ interface Props {
 
 export default function SOSConfirmation({ navigate, selectedService, priority }: Props) {
   const dispatch = useOptionalDispatch();
+  const { userId } = useAuth();
+  const { clientProfile } = useData();
   const activeRequest = dispatch?.activeRequest;
   const submittedRef = useRef(false);
   const [countdown, setCountdown] = useState(3);
@@ -21,23 +26,86 @@ export default function SOSConfirmation({ navigate, selectedService, priority }:
   useEffect(() => {
     if (submittedRef.current) return;
     submittedRef.current = true;
-    try {
-      if (dispatch?.submitSOSRequest) {
-        const request = dispatch.submitSOSRequest({ service: safeService, priority: safePriority });
-        console.log('[client] SOS request submitted', {
-          id: request.id,
-          service: request.service,
-          priority: request.priority,
-          status: request.status,
-          location: request.location,
-        });
-      } else {
-        console.error('[client] SOS request not submitted: dispatch provider unavailable');
+
+    async function submitRequest() {
+      try {
+        if (dispatch?.submitSOSRequest) {
+          const request = dispatch.submitSOSRequest({
+            service: safeService,
+            priority: safePriority,
+            landmarkAndInstructions: dispatch.confirmedLocation?.landmarkAndInstructions,
+          });
+          console.log('[client] SOS request submitted locally', {
+            id: request.id,
+            service: request.service,
+            priority: request.priority,
+            status: request.status,
+            location: request.location,
+          });
+        } else {
+          console.error('[client] SOS request not submitted: dispatch provider unavailable');
+        }
+
+        // Snapshot request into Supabase public.requests
+        if (userId) {
+          const normalizedSlug = safeService.toLowerCase().replace('-repair', '').replace(/[^a-z]/g, '');
+          const { data: matchedCat } = await supabase
+            .from('service_categories')
+            .select('id, sos_base_price, sos_emergency_fee')
+            .or(`slug.eq.${safeService},slug.eq.${normalizedSlug}`)
+            .maybeSingle();
+
+          let catId = matchedCat?.id;
+          let basePrice = matchedCat?.sos_base_price ?? 499;
+          let fee = matchedCat?.sos_emergency_fee ?? 149;
+
+          if (!catId) {
+            const { data: fallbackCat } = await supabase
+              .from('service_categories')
+              .select('id, sos_base_price, sos_emergency_fee')
+              .limit(1)
+              .maybeSingle();
+            if (fallbackCat?.id) {
+              catId = fallbackCat.id;
+              basePrice = fallbackCat.sos_base_price ?? 499;
+              fee = fallbackCat.sos_emergency_fee ?? 149;
+            }
+          }
+
+          if (catId) {
+            const lat = dispatch?.confirmedLocation?.latitude ?? 28.6083;
+            const lng = dispatch?.confirmedLocation?.longitude ?? 77.4267;
+            const locationText = dispatch?.confirmedLocation?.fullAddress || safeLocation;
+            const addressNotes = dispatch?.confirmedLocation?.landmarkAndInstructions || null;
+            const addressLine = dispatch?.confirmedLocation?.houseFlat || locationText;
+            const area = dispatch?.confirmedLocation?.societyName || dispatch?.confirmedLocation?.areaCity || dispatch?.confirmedLocation?.area || 'Greater Noida West';
+
+            await supabase.from('requests').insert({
+              client_id: userId,
+              user_id: userId,
+              category_id: catId,
+              priority: (safePriority === 'high' || safePriority === 'low') ? safePriority : 'medium',
+              status: 'pending',
+              address_line: addressLine,
+              area: area,
+              address_text: locationText,
+              address_notes: addressNotes,
+              service_location: `POINT(${lng} ${lat})`,
+              contact_name: clientProfile?.name || 'Abdullah Sheikh',
+              contact_phone: clientProfile?.phone || '+919876543210',
+              estimated_total: basePrice + fee,
+              symptoms: [`Emergency assistance for ${safeService}`],
+              search_radius_km: 10,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('[client] SOS request submission failed', error);
       }
-    } catch (error) {
-      console.error('[client] SOS request submission failed', error);
     }
-  }, [dispatch, safePriority, safeService]);
+
+    void submitRequest();
+  }, [dispatch, safePriority, safeService, safeLocation, userId, clientProfile]);
 
   useEffect(() => {
     const timer = setInterval(() => {

@@ -50,6 +50,7 @@ export interface DispatchJob {
   technicianId?: string
   technicianName?: string
   attachments: DispatchAttachment[]
+  landmarkAndInstructions?: string
 }
 
 export type SOSRequest = DispatchJob
@@ -71,6 +72,11 @@ export interface ConfirmedLocation {
   area: string
   latitude?: number
   longitude?: number
+  houseFlat?: string
+  societyName?: string
+  areaCity?: string
+  pincode?: string
+  landmarkAndInstructions?: string
 }
 
 /**

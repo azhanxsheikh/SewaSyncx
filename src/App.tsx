@@ -25,7 +25,6 @@ import ScheduledBooking from './screens/ScheduledBooking';
 import BookingHistory from './screens/BookingHistory';
 import Profile from './screens/Profile';
 import Notifications from './screens/Notifications';
-import AdminDashboard from './components/admin/AdminDashboard';
 import Login from './components/Login';
 import { DispatchProvider } from './context/DispatchContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -121,7 +120,8 @@ function AppInner() {
         </div>
       );
     }
-    return <AdminDashboard navigate={navigate} onBack={() => {}} />;
+    window.location.href = window.location.hostname === 'localhost' ? 'http://localhost:3003' : '/admin';
+    return null;
   }
 
   if (status === 'signed-out') {
@@ -201,7 +201,10 @@ function AppInner() {
     'sos-invoice': (
       <DigitalInvoice
         navigate={navigate}
-        onBack={() => navigate('sos-completed')}
+        onBack={() => {
+          clearJustCompleted();
+          navigate(prevScreen === 'sos-completed' ? 'bookings' : (prevScreen || 'home'));
+        }}
       />
     ),
     'sos-payment': (
@@ -282,7 +285,7 @@ function AppInner() {
     bookings: <BookingHistory navigate={navigate} />,
     profile: <Profile navigate={navigate} />,
     notifications: <Notifications navigate={navigate} onBack={() => navigate(prevScreen)} />,
-    admin: <AdminDashboard navigate={navigate} onBack={() => navigate('profile')} />,
+    admin: <div className="p-4 text-center text-sm text-gray-500">Redirecting to Admin Ops Console...</div>,
   };
 
   return (

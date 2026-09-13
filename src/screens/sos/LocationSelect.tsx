@@ -6,6 +6,8 @@ import LeafletLocationMap, { reverseGeocode } from '../../components/LeafletLoca
 import { useDispatch } from '../../context/DispatchContext';
 import type { ConfirmedLocation } from '../../types/dispatch';
 import type { SavedAddress } from '../../types/domain';
+import { AddressModal } from '../../components/profile/AddressModal';
+import { constructFullAddressText } from '../../utils/geocoding';
 
 interface Props {
   navigate: (s: Screen) => void;
@@ -20,6 +22,8 @@ export default function LocationSelect({ navigate, onBack }: Props) {
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number; accuracy?: number; address?: string } | null>(null);
   const [locationState, setLocationState] = useState<'idle' | 'loading' | 'error'>('idle');
   const [locationError, setLocationError] = useState('');
+  const [isAddAddressModalOpen, setIsAddAddressModalOpen] = useState(false);
+  const [technicianNotes, setTechnicianNotes] = useState(confirmedLocation.landmarkAndInstructions || '');
   const watchIdRef = useRef<number | null>(null);
   const requestIdRef = useRef(0);
 
@@ -91,9 +95,31 @@ export default function LocationSelect({ navigate, onBack }: Props) {
     setLocationState('idle');
     setLocationError('');
     setSelected(address.id);
-    const fullAddress = `${address.address}, ${address.area}`;
+    const fullAddress = address.addressLine1
+      ? constructFullAddressText({
+          houseFlat: address.addressLine1,
+          societyName: address.addressLine2,
+          areaCity: address.city || address.area,
+          pincode: address.postalCode,
+          landmarkAndInstructions: address.landmark,
+        })
+      : `${address.address}, ${address.area}`;
     setMapLocation(fullAddress);
-    setConfirmedLocation({ id: address.id, label: address.label, fullAddress, area: address.area });
+    const notes = address.landmark || '';
+    setTechnicianNotes(notes);
+    setConfirmedLocation({
+      id: address.id,
+      label: address.label,
+      fullAddress,
+      area: address.area,
+      latitude: address.latitude,
+      longitude: address.longitude,
+      houseFlat: address.addressLine1,
+      societyName: address.addressLine2,
+      areaCity: address.city || address.area,
+      pincode: address.postalCode,
+      landmarkAndInstructions: notes,
+    });
   }, [clearLocationWatch, setConfirmedLocation]);
 
   const setDraggedLocation = useCallback((fullAddress: string) => {
@@ -183,6 +209,41 @@ export default function LocationSelect({ navigate, onBack }: Props) {
               </button>
             ))}
 
+            {/* Add Address button */}
+            <button
+              type="button"
+              onClick={() => setIsAddAddressModalOpen(true)}
+              className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl border-2 border-dashed border-gray-200 hover:border-red-400 bg-gray-50/60 hover:bg-red-50/40 text-gray-700 hover:text-red-600 transition-all text-sm font-semibold"
+            >
+              <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>+ Add New Address with Technician Notes</span>
+            </button>
+          </div>
+
+          {/* Technician helper notes */}
+          <div className="mt-4 p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <span className="text-base">🚩</span>
+              <label className="text-xs font-bold text-amber-900">
+                Landmark & Entry Instructions for Technician
+              </label>
+            </div>
+            <p className="text-[11px] text-amber-800 mb-2 leading-relaxed">
+              Help the technician find your door fast: gate number, building entry, lift instructions, or society security protocols.
+            </p>
+            <input
+              type="text"
+              value={technicianNotes}
+              onChange={(e) => {
+                const val = e.target.value;
+                setTechnicianNotes(val);
+                setConfirmedLocation({ ...confirmedLocation, landmarkAndInstructions: val });
+              }}
+              placeholder="e.g. Gate 2, Tower B, tell guard Flat 402, use Service Lift"
+              className="w-full px-3 py-2 text-xs bg-white rounded-xl border border-amber-300 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+            />
           </div>
 
           {/* Privacy notice */}
@@ -205,6 +266,11 @@ export default function LocationSelect({ navigate, onBack }: Props) {
           </button>
         </div>
       </div>
+
+      <AddressModal
+        isOpen={isAddAddressModalOpen}
+        onClose={() => setIsAddAddressModalOpen(false)}
+      />
     </div>
   );
 }

@@ -136,6 +136,12 @@ export default function DigitalInvoice({ navigate, onBack }: Props) {
           >
             Rate Your Experience →
           </button>
+          <button
+            onClick={onBack}
+            className="w-full py-3 rounded-xl font-display font-600 text-sm text-gray-500 hover:text-gray-800 transition-colors"
+          >
+            Done & View Bookings
+          </button>
         </div>
       </div>
     </div>

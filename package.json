@@ -4,17 +4,19 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n \"CLIENT,ADMIN\" -c \"blue,green\" \"pnpm run dev:client\" \"pnpm run dev:admin\"",
-    "dev:client": "VITE_APP_TARGET=client vite --port 3001 --strictPort",
-    "dev:admin": "VITE_APP_TARGET=admin vite --port 3002 --strictPort",
-    "dev:technician": "pnpm --filter technician dev",
-    "dev:all": "concurrently -n \"CLIENT,ADMIN,TECH\" -c \"blue,green,magenta\" \"pnpm run dev:client\" \"pnpm run dev:admin\" \"pnpm run dev:technician\"",
-    "build": "tsc && vite build",
-    "build:client": "tsc && VITE_APP_TARGET=client vite build",
-    "build:admin": "tsc && VITE_APP_TARGET=admin vite build",
+    "dev": "concurrently -n \"CLIENT,TECH,ADMIN\" -c \"blue,green,red\" \"npm run dev:client\" \"npm run dev:technician\" \"npm run dev:admin\"",
+    "dev:client": "vite --config apps/client/vite.config.ts",
+    "dev:technician": "vite --config apps/technician/vite.config.ts",
+    "dev:admin": "vite --config apps/admin/vite.config.ts",
+    "dev:all": "concurrently -n \"CLIENT,TECH,ADMIN\" -c \"blue,green,red\" \"pnpm run dev:client\" \"pnpm run dev:technician\" \"pnpm run dev:admin\"",
+    "build": "tsc && vite build --config apps/client/vite.config.ts && vite build --config apps/technician/vite.config.ts && vite build --config apps/admin/vite.config.ts",
+    "build:client": "tsc && vite build --config apps/client/vite.config.ts",
+    "build:technician": "tsc && vite build --config apps/technician/vite.config.ts",
+    "build:admin": "tsc && vite build --config apps/admin/vite.config.ts",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
-    "format": "oxfmt"
+    "format": "oxfmt",
+    "postinstall": "node scripts/patch-vite.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

@@ -83,10 +83,10 @@ interface DispatchContextValue {
   confirmedLocation: ConfirmedLocation
   setConfirmedLocation: (location: ConfirmedLocation) => void
   createJob: (
-    input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "customerName" | "customerPhone" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude">>,
+    input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "customerName" | "customerPhone" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude" | "landmarkAndInstructions">>,
   ) => DispatchJob
   submitSOSRequest: (
-    input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude">> & {
+    input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude" | "landmarkAndInstructions">> & {
       locationOverride?: { address: string; area: string }
       requestedFor?: {
         memberId: string
@@ -304,8 +304,8 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
 
   const updateJob = useCallback((patch: Partial<DispatchJob>) => {
     setJob((current) => {
-      if (!current) return current
-      const next = { ...current, ...patch, updatedAt: Date.now() }
+      if (!current && !patch.id) return current
+      const next = current ? { ...current, ...patch, updatedAt: Date.now() } : (patch as DispatchJob)
       writeStorage(STORAGE_KEY, next)
       publish({ type: "job-updated", job: next })
       void publishToDispatchBridge({ type: "job-updated", job: next })
@@ -320,7 +320,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
 
   const createJob = useCallback(
     (
-      input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "customerName" | "customerPhone" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude">>,
+      input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "customerName" | "customerPhone" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude" | "landmarkAndInstructions">>,
     ) => {
       const next: DispatchJob = {
         id: `job-${Date.now()}`,
@@ -340,6 +340,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
         requestedForRelation: input.requestedForRelation,
         serviceLatitude: input.serviceLatitude,
         serviceLongitude: input.serviceLongitude,
+        landmarkAndInstructions: input.landmarkAndInstructions,
         searchRadiusKm: 10,
         estimatedTotal: estimateJobTotal(input.service, input.priority ?? "medium"),
         createdAt: Date.now(),
@@ -365,7 +366,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
 
   const submitSOSRequest = useCallback(
     (
-      input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude">> & {
+      input: Pick<DispatchJob, "service"> & Partial<Pick<DispatchJob, "priority" | "symptoms" | "description" | "location" | "attachments" | "requesterUserId" | "requesterName" | "requesterPhone" | "requestedForMemberId" | "requestedForRelation" | "serviceLatitude" | "serviceLongitude" | "landmarkAndInstructions">> & {
         locationOverride?: { address: string; area: string }
         requestedFor?: {
           memberId: string
@@ -391,6 +392,7 @@ export function DispatchProvider({ children }: { children: ReactNode }) {
         location,
         serviceLatitude: input.serviceLatitude ?? (requestedFor ? undefined : confirmedLocation.latitude),
         serviceLongitude: input.serviceLongitude ?? (requestedFor ? undefined : confirmedLocation.longitude),
+        landmarkAndInstructions: input.landmarkAndInstructions ?? (requestedFor ? undefined : confirmedLocation.landmarkAndInstructions),
         ...(requestedFor
           ? {
               customerName: requestedFor.name,

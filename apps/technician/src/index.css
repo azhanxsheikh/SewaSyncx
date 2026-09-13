@@ -1,4 +1,7 @@
 @import '../../../src/index.css';
+@source '../../../src';
+@source '../../../packages/shared';
+@source './';
 
 .technician-portal {
 	--tech-page: #f9fafb;

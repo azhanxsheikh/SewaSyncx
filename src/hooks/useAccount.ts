@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import {
   clientProfile as fixtureClientProfile,
   clientStats as fixtureClientStats,
-  familyMembers as fixtureFamilyMembers,
   notifications,
   savedAddresses as fixtureSavedAddresses,
 } from '../fixtures/account.fixture';
@@ -39,8 +38,19 @@ export function useSavedAddresses(): SavedAddress[] {
 
 export function useFamilyMembers(): FamilyMember[] {
   const { ready, familyMembers } = useData();
-  return ready && familyMembers.length ? familyMembers : fixtureFamilyMembers;
+  return ready ? familyMembers : [];
 }
+
+const emptyFamilyMember: FamilyMember = {
+  id: '',
+  name: 'Family Member',
+  relation: '',
+  phone: '',
+  emoji: '👤',
+  color: 'blue',
+  address: '',
+  area: '',
+};
 
 /**
  * Resolves a family member by id, falling back to the first record.
@@ -51,12 +61,17 @@ export function useFamilyMembers(): FamilyMember[] {
 export function useFamilyMember(memberId: string): FamilyMember {
   const familyMembers = useFamilyMembers();
   return useMemo(
-    () => familyMembers.find((member) => member.id === memberId) || familyMembers[0],
+    () => familyMembers.find((member) => member.id === memberId) || familyMembers[0] || emptyFamilyMember,
     [familyMembers, memberId],
   );
 }
 
-/** No `notifications` table exists in any migration — stays fixture-backed. */
 export function useNotifications(): NotificationRecord[] {
-  return notifications;
+  const { notifications: liveNotifications } = useData();
+  return liveNotifications.length ? liveNotifications : notifications;
+}
+
+export function useUnreadNotificationsCount(): number {
+  const notificationsList = useNotifications();
+  return notificationsList.filter((n) => !n.read).length;
 }

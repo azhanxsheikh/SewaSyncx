@@ -3,7 +3,8 @@ import { useDispatch } from "../../context/DispatchContext"
 import type { ExecutionStep, JobStatus, PriceAdjustmentReason } from "../../types/dispatch"
 import { executionSteps as steps } from "../../fixtures/requests.fixture"
 import TechnicianDirectionsMap from "../../components/TechnicianDirectionsMap"
-import { settleJobPaymentRpc } from "../../lib/supabase"
+import { supabase } from "../../lib/supabaseClient"
+import { constructGoogleMapsNavigationUrl } from "../../utils/geocoding"
 
 export default function ActiveJob() {
   const { job, updateJobStatus, updateJob } = useDispatch()
@@ -57,24 +58,16 @@ export default function ActiveJob() {
     setIsSubmitting(true)
     try {
       if (job.id) {
-        const res = await settleJobPaymentRpc(
-          job.id,
-          parsedPrice,
-          adjustmentReason,
-          adjustmentNotes || undefined,
-        )
-        if (res.error) {
-          // Auth is real now (src/context/AuthContext.tsx) — this call does
-          // reach the database as the signed-in technician. It still fails
-          // for a real job here, though: job.id is DispatchContext's local
-          // simulated id (`job-${Date.now()}`), not a real requests.id, so
-          // settle_job_payment correctly raises request_not_found. That's
-          // the remaining gap: DispatchContext doesn't create/track a real
-          // requests row yet. Local state still advances below so the demo
-          // flow keeps working in the meantime.
-          console.warn("[technician] settle_job_payment RPC error:", res.error)
+        const { data: rpcData, error: rpcError } = await supabase.rpc("settle_job_payment", {
+          p_request_id: job.id,
+          p_final_price: parsedPrice,
+          p_reason: adjustmentReason,
+          p_notes: adjustmentNotes || undefined,
+        })
+        if (rpcError) {
+          console.warn("[technician] settle_job_payment RPC error:", rpcError.message)
         } else {
-          console.log("[technician] settle_job_payment RPC success:", res.data)
+          console.log("[technician] settle_job_payment RPC success:", rpcData)
         }
       }
       updateJob({
@@ -102,6 +95,20 @@ export default function ActiveJob() {
         <p className="mt-1 text-slate-400">
           {job.location} · {job.customerName}
         </p>
+        {job.landmarkAndInstructions && (
+          <div className="mt-3 mb-4 rounded-2xl border border-amber-500/30 bg-amber-950/40 p-4 text-left shadow-sm">
+            <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+              <span>🚩</span>
+              <span>Landmark & Entry Instructions for Technician</span>
+            </div>
+            <p className="mt-1.5 text-sm text-amber-100 font-medium leading-relaxed">
+              {job.landmarkAndInstructions}
+            </p>
+            <p className="mt-1 text-[11px] text-amber-300/70">
+              💡 Show this at security gate / MyGate checkpoint for faster society entry
+            </p>
+          </div>
+        )}
         <TechnicianDirectionsMap
           serviceLatitude={job.serviceLatitude}
           serviceLongitude={job.serviceLongitude}
@@ -207,14 +214,14 @@ export default function ActiveJob() {
             <a
               href={
                 job.serviceLatitude !== undefined && job.serviceLongitude !== undefined
-                  ? `https://www.google.com/maps/dir/?api=1&destination=${job.serviceLatitude},${job.serviceLongitude}`
-                  : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.location)}`
+                  ? constructGoogleMapsNavigationUrl(job.serviceLatitude, job.serviceLongitude, "two_wheeler")
+                  : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.location)}&destination_place_id=&travelmode=two_wheeler`
               }
               target="_blank"
               rel="noreferrer"
-              className="mt-2 block rounded-lg bg-slate-800 py-2 text-center text-sm font-600"
+              className="mt-2 block rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white py-2 text-center text-sm font-600 transition-colors shadow-sm"
             >
-              Navigate to client
+              Navigate to client (Google Maps ↗)
             </a>
           </div>
           <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">

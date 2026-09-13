@@ -101,6 +101,8 @@ export interface FamilyMember {
   area: string;
   phone: string;
   color: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 /** Maps to `saved_addresses`. */
@@ -110,6 +112,14 @@ export interface SavedAddress {
   icon: string;
   address: string;
   area: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  landmark?: string;
+  city?: string;
+  postalCode?: string;
+  latitude?: number;
+  longitude?: number;
+  isDefault?: boolean;
 }
 
 /** Aggregate counters rendered on the profile screen. */
@@ -135,6 +145,11 @@ export interface BookingRecord {
   /** `'sos'` ⇔ `scheduled_at IS NULL`; `'scheduled'` ⇔ `scheduled_at IS NOT NULL`. */
   type: string;
   rating: number;
+  description?: string;
+  priority?: string;
+  estimatedTotal?: number;
+  photos?: string[];
+  rawStatus?: string;
 }
 
 /** Maps to `request_status_events` rendered as a client-facing timeline. */

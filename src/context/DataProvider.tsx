@@ -34,10 +34,13 @@ import {
 } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from './AuthContext';
+import { notifications as initialNotifications } from '../fixtures/account.fixture';
+import { parseGeoPoint } from '../hooks/useLiveTechnicianTracking';
 import type {
   BookingRecord,
   ClientStats,
   FamilyMember,
+  NotificationRecord,
   SavedAddress,
   ScheduledCategory,
   ServiceCategory,
@@ -86,10 +89,15 @@ interface DataState {
    * not from this real request row, since those two aren't unified yet.
    */
   justCompletedRequestId: string | null;
+  notifications: NotificationRecord[];
+  toastMessage: string | null;
 }
 
 interface DataContextValue extends DataState {
   clearJustCompleted: () => void;
+  refreshClientData: () => Promise<void>;
+  markNotificationsAsRead: () => void;
+  clearToast: () => void;
 }
 
 const EMPTY_STATE: DataState = {
@@ -106,11 +114,16 @@ const EMPTY_STATE: DataState = {
   varianceRequests: [],
   disputes: [],
   justCompletedRequestId: null,
+  notifications: initialNotifications,
+  toastMessage: null,
 };
 
 const DataContext = createContext<DataContextValue>({
   ...EMPTY_STATE,
   clearJustCompleted: () => {},
+  refreshClientData: async () => {},
+  markNotificationsAsRead: () => {},
+  clearToast: () => {},
 });
 
 // ---------------------------------------------------------------------------
@@ -196,24 +209,40 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
       : null;
 
-    const savedAddresses: SavedAddress[] = (addressRows.data ?? []).map((row) => ({
-      id: row.id,
-      label: row.label,
-      icon: row.icon ?? '📍',
-      address: row.address_line,
-      area: row.area,
-    }));
+    const savedAddresses: SavedAddress[] = (addressRows.data ?? []).map((row) => {
+      const coords = parseGeoPoint(row.location);
+      return {
+        id: row.id,
+        label: row.label,
+        icon: row.icon ?? '📍',
+        address: row.address_line,
+        area: row.area,
+        addressLine1: row.address_line1 ?? undefined,
+        addressLine2: row.address_line2 ?? undefined,
+        landmark: row.landmark ?? undefined,
+        city: row.city ?? undefined,
+        postalCode: row.postal_code ?? undefined,
+        latitude: row.latitude !== null && row.latitude !== undefined ? Number(row.latitude) : coords?.latitude,
+        longitude: row.longitude !== null && row.longitude !== undefined ? Number(row.longitude) : coords?.longitude,
+        isDefault: row.is_default,
+      };
+    });
 
-    const familyMembers: FamilyMember[] = (familyRows.data ?? []).map((row) => ({
-      id: row.id,
-      name: row.name,
-      relation: row.relation,
-      emoji: row.emoji ?? '👤',
-      address: row.address_line,
-      area: row.area,
-      phone: row.phone ?? '',
-      color: 'blue',
-    }));
+    const familyMembers: FamilyMember[] = (familyRows.data ?? []).map((row) => {
+      const coords = parseGeoPoint(row.location);
+      return {
+        id: row.id,
+        name: row.name,
+        relation: row.relation,
+        emoji: row.emoji ?? '👤',
+        address: row.address_line,
+        area: row.area,
+        phone: row.phone ?? '',
+        color: 'blue',
+        latitude: coords?.latitude,
+        longitude: coords?.longitude,
+      };
+    });
 
     type RequestWithJoins = RequestRow & {
       service_categories: { name: string; icon: string } | null;
@@ -228,9 +257,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       technician: r.technician?.name ?? 'Unassigned',
       date: formatDate(r.created_at),
       status: formatStatus(r.status),
+      rawStatus: r.status,
       amount: `₹${r.final_price ?? r.estimated_total}`,
       type: r.scheduled_at ? 'scheduled' : 'sos',
       rating: 0,
+      description: r.description ?? undefined,
+      priority: r.priority ?? undefined,
+      estimatedTotal: r.estimated_total ? Number(r.estimated_total) : undefined,
+      photos: (r as { photos?: string[] }).photos ?? [],
     }));
 
     const nonTerminalStatuses: RequestRow['status'][] = ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'];
@@ -349,11 +383,35 @@ export function DataProvider({ children }: { children: ReactNode }) {
         { event: 'UPDATE', schema: 'public', table: 'requests', filter: `client_id=eq.${userId}` },
         (payload) => {
           const newRow = payload.new as RequestRow | undefined;
+          let newNotif: NotificationRecord | null = null;
+          if (newRow?.status) {
+            const statusMap: Record<string, { title: string; icon: string }> = {
+              accepted: { title: 'Technician assigned to your emergency request', icon: '👨‍🔧' },
+              en_route: { title: 'Technician is en route to your location', icon: '🚗' },
+              arrived: { title: 'Technician has arrived at your address', icon: '📍' },
+              in_progress: { title: 'Service repair is now in progress', icon: '⚡' },
+              completed: { title: 'Service completed! View your invoice', icon: '🎉' },
+              cancelled: { title: 'Service request has been cancelled', icon: '❌' },
+            };
+            const item = statusMap[newRow.status];
+            if (item) {
+              newNotif = {
+                id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                title: item.title,
+                time: 'Just now',
+                read: false,
+                icon: item.icon,
+              };
+            }
+          }
+
           loadClientData(userId).then((patch) =>
             setState((s) => ({
               ...s,
               ...patch,
               justCompletedRequestId: newRow?.status === 'completed' ? newRow.id : s.justCompletedRequestId,
+              notifications: newNotif ? [newNotif, ...s.notifications] : s.notifications,
+              toastMessage: newNotif ? newNotif.title : s.toastMessage,
             })),
           );
         },
@@ -410,7 +468,34 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setState((s) => (s.justCompletedRequestId ? { ...s, justCompletedRequestId: null } : s));
   }, []);
 
-  const value = useMemo(() => ({ ...state, clearJustCompleted }), [state, clearJustCompleted]);
+  const refreshClientData = useCallback(async () => {
+    if (userId && role === 'client') {
+      const patch = await loadClientData(userId);
+      setState((s) => ({ ...s, ...patch }));
+    }
+  }, [userId, role, loadClientData]);
+
+  const markNotificationsAsRead = useCallback(() => {
+    setState((s) => ({
+      ...s,
+      notifications: s.notifications.map((n) => ({ ...n, read: true })),
+    }));
+  }, []);
+
+  const clearToast = useCallback(() => {
+    setState((s) => (s.toastMessage ? { ...s, toastMessage: null } : s));
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      ...state,
+      clearJustCompleted,
+      refreshClientData,
+      markNotificationsAsRead,
+      clearToast,
+    }),
+    [state, clearJustCompleted, refreshClientData, markNotificationsAsRead, clearToast],
+  );
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }
