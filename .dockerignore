@@ -1,0 +1,35 @@
+# Keep the build context to what `pnpm install` and `vite build` need.
+
+# Dependencies and build output (rebuilt inside the image)
+**/node_modules
+**/dist
+**/build
+coverage
+.vite
+*.tsbuildinfo
+
+# VCS and CI
+.git
+.github
+
+# Secrets. Vite env vars reach the build only through --build-arg.
+.env*
+!.env.example
+
+# Supabase CLI state, migrations and seed media (not part of the SPA)
+.supabase
+supabase
+
+# Local tooling, logs, OS artefacts
+.claude-replay.*
+.tmp-*
+*.log
+.DS_Store
+Thumbs.db
+
+# Container definitions themselves
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# NOTE: .figma/ must stay in the context: vite.config.ts imports .figma/make/site.json.
