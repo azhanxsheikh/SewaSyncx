@@ -26,7 +26,9 @@ import BookingHistory from './screens/BookingHistory';
 import Profile from './screens/Profile';
 import Notifications from './screens/Notifications';
 import AdminDashboard from './components/admin/AdminDashboard';
+import Login from './components/Login';
 import { DispatchProvider } from './context/DispatchContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import SOSRouteErrorBoundary from './components/SOSRouteErrorBoundary';
 import { getAppTarget } from './lib/appTarget';
 
@@ -34,9 +36,18 @@ type FamilySubScreen = 'list' | 'member' | 'tracking';
 type ScheduledSubScreen = 'category' | 'service' | 'datetime' | 'address' | 'pricing' | 'confirmation';
 
 export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
+  );
+}
+
+function AppInner() {
   // Resolved once per render from env/port/path, not component state: which
   // surface this build serves is fixed for its lifetime (see lib/appTarget).
   const target = getAppTarget();
+  const { status } = useAuth();
 
   const [screen, setScreen] = useState<Screen>('home');
   const [prevScreen, setPrevScreen] = useState<Screen>('home');
@@ -74,8 +85,21 @@ export default function App() {
   // Console" entry point reachable from Profile on the client target.
   // "Exit Console" has nothing to return to here, so it's inert rather than
   // wired to a client screen.
+  if (status === 'loading') {
+    return null;
+  }
+
   if (target === 'admin') {
+    // Staff-role verification (platform_staff) lands with the governance
+    // migration; for now, admin only requires any authenticated session.
+    if (status === 'signed-out') {
+      return <Login title="SewaSync Ops Console" subtitle="Staff sign-in" theme="dark" />;
+    }
     return <AdminDashboard navigate={navigate} onBack={() => {}} />;
+  }
+
+  if (status === 'signed-out') {
+    return <Login title="SOS HomeFix" subtitle="Sign in to continue" theme="light" />;
   }
 
   const screenMap: Record<Screen, ReactElement> = {

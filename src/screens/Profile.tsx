@@ -1,6 +1,7 @@
 import type { Screen } from '../types/navigation';
 import { accountMenuItems, supportMenuItems } from '../fixtures/account.fixture';
 import { useClientProfile, useClientStats, useSavedAddresses } from '../hooks/useAccount';
+import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
 import BottomNav from '../components/BottomNav';
 
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export default function Profile({ navigate }: Props) {
+  const { signOut } = useAuth();
   const profile = useClientProfile();
   const stats = useClientStats();
   const savedAddresses = useSavedAddresses();
@@ -126,7 +128,10 @@ export default function Profile({ navigate }: Props) {
         </button>
 
         {/* Logout */}
-        <button className="w-full py-3.5 rounded-2xl border border-red-100 text-red-500 font-600 text-sm hover:bg-red-50 transition-colors">
+        <button
+          onClick={() => signOut()}
+          className="w-full py-3.5 rounded-2xl border border-red-100 text-red-500 font-600 text-sm hover:bg-red-50 transition-colors"
+        >
           Sign Out
         </button>
       </div>

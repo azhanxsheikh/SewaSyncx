@@ -71,9 +71,11 @@ Vite would need to reconcile, which is exactly the ambiguity
 
 ## Known gaps
 
-- **No authentication in front of the Admin build.** Anyone with the Admin
-  project's URL can load the Ops console. Use Vercel Deployment Protection
-  (above) until the console has its own login.
+- **The Admin build only requires *a* Supabase session, not a staff one.**
+  `src/App.tsx` now gates the admin target behind `AuthContext` (any signed-in
+  user, including an ordinary client), pending the `platform_staff` table and
+  a real staff-role check. Until that lands, use Vercel Deployment Protection
+  (above) as the real access control for this project.
 - **`AdminDashboard`'s "Exit Console" button is inert on this deployment.**
   It's wired to a `navigate` callback that only makes sense inside the
   client screen router (see the comment in `src/App.tsx` above the

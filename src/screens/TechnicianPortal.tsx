@@ -4,12 +4,14 @@ import IncomingAlert from './technician/IncomingAlert';
 import ActiveJob from './technician/ActiveJob';
 import JobHistory from './technician/JobHistory';
 import { useDispatch } from '../context/DispatchContext';
+import { useAuth } from '../context/AuthContext';
 
 type PortalTab = 'dashboard' | 'alerts' | 'active' | 'history';
 
 export default function TechnicianPortal() {
   const [tab, setTab] = useState<PortalTab>('dashboard');
   const { job } = useDispatch();
+  const { session, signOut } = useAuth();
   const hasAlert = job?.status === 'requested' || job?.status === 'searching';
   const hasActive = Boolean(job && ['accepted', 'en-route', 'arrived', 'in-progress'].includes(job.status));
 
@@ -29,7 +31,7 @@ export default function TechnicianPortal() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500 font-display font-800">SH</div>
             <div><p className="font-display font-800">Technician Portal</p><p className="text-xs text-slate-400">SOS HomeFix Dispatch</p></div>
           </div>
-          <div className="flex items-center gap-2 text-sm"><span className="h-2 w-2 rounded-full bg-emerald-400" /> Rahul Kumar <span className="text-slate-500">|</span> Online</div>
+          <div className="flex items-center gap-2 text-sm"><span className="h-2 w-2 rounded-full bg-emerald-400" /> {session?.user.email ?? 'Technician'} <span className="text-slate-500">|</span> Online <span className="text-slate-500">|</span> <button onClick={() => signOut()} className="text-slate-400 hover:text-white underline">Sign out</button></div>
         </div>
       </header>
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-5 py-6 lg:flex-row">

@@ -64,11 +64,14 @@ export default function ActiveJob() {
           adjustmentNotes || undefined,
         )
         if (res.error) {
-          // Expected today: settle_job_payment requires auth.uid() to match
-          // the request's technician_id, and this app has no real session
-          // yet (see docs/DEPLOYMENT roadmap) — every call authenticates as
-          // the anon key, so this always fails server-side for now. Local
-          // state still advances below so the demo flow keeps working.
+          // Auth is real now (src/context/AuthContext.tsx) — this call does
+          // reach the database as the signed-in technician. It still fails
+          // for a real job here, though: job.id is DispatchContext's local
+          // simulated id (`job-${Date.now()}`), not a real requests.id, so
+          // settle_job_payment correctly raises request_not_found. That's
+          // the remaining gap: DispatchContext doesn't create/track a real
+          // requests row yet. Local state still advances below so the demo
+          // flow keeps working in the meantime.
           console.warn("[technician] settle_job_payment RPC error:", res.error)
         } else {
           console.log("[technician] settle_job_payment RPC success:", res.data)

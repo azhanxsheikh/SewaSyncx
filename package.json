@@ -17,6 +17,7 @@
     "format": "oxfmt"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.116.0",
     "ioredis": "^5.11.1",
     "leaflet": "^1.9.4",
     "react": "^19.0.0",
