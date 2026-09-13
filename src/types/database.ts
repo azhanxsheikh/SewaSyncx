@@ -703,6 +703,60 @@ export type Database = {
           },
         ]
       }
+      technician_location_pings: {
+        Row: {
+          accuracy_meters: number | null
+          battery_saver_suspected: boolean
+          heading: number | null
+          id: number
+          location: unknown
+          network_type: Database["public"]["Enums"]["network_type"] | null
+          recorded_at: string
+          request_id: string | null
+          speed: number | null
+          technician_id: string
+        }
+        Insert: {
+          accuracy_meters?: number | null
+          battery_saver_suspected?: boolean
+          heading?: number | null
+          id?: never
+          location: unknown
+          network_type?: Database["public"]["Enums"]["network_type"] | null
+          recorded_at?: string
+          request_id?: string | null
+          speed?: number | null
+          technician_id: string
+        }
+        Update: {
+          accuracy_meters?: number | null
+          battery_saver_suspected?: boolean
+          heading?: number | null
+          id?: never
+          location?: unknown
+          network_type?: Database["public"]["Enums"]["network_type"] | null
+          recorded_at?: string
+          request_id?: string | null
+          speed?: number | null
+          technician_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_location_pings_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_location_pings_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technician_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       technician_locations: {
         Row: {
           heading: number | null
@@ -816,7 +870,7 @@ export type Database = {
           email: string | null
           id: string
           name: string
-          phone: string | null
+          phone: string
           preferred_language: string | null
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
@@ -829,7 +883,7 @@ export type Database = {
           email?: string | null
           id: string
           name: string
-          phone?: string | null
+          phone: string
           preferred_language?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
@@ -842,7 +896,7 @@ export type Database = {
           email?: string | null
           id?: string
           name?: string
-          phone?: string | null
+          phone?: string
           preferred_language?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
@@ -947,6 +1001,28 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      complete_profile: {
+        Args: { p_name: string; p_phone: string }
+        Returns: {
+          created_at: string
+          default_location: unknown
+          default_street_address: string | null
+          default_unit_floor: string | null
+          email: string | null
+          id: string
+          name: string
+          phone: string
+          preferred_language: string | null
+          role: Database["public"]["Enums"]["user_role"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "users"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_nearby_matching_technicians: {
         Args: { p_radius_meters: number; p_request_id: string }
         Returns: {
@@ -958,6 +1034,32 @@ export type Database = {
           total_jobs: number
         }[]
       }
+      report_technician_location: {
+        Args: {
+          p_accuracy_meters?: number
+          p_battery_saver_suspected?: boolean
+          p_heading?: number
+          p_lat: number
+          p_lng: number
+          p_network_type?: Database["public"]["Enums"]["network_type"]
+          p_speed?: number
+        }
+        Returns: {
+          heading: number | null
+          id: string
+          location: unknown
+          request_id: string | null
+          speed: number | null
+          technician_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "technician_locations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       request_execution_window: {
         Args: {
           p_accepted_at: string
@@ -965,6 +1067,10 @@ export type Database = {
           p_scheduled_at: string
         }
         Returns: unknown
+      }
+      request_status_is_terminal: {
+        Args: { p_status: Database["public"]["Enums"]["request_status"] }
+        Returns: boolean
       }
       request_transition_allowed: {
         Args: {
@@ -995,6 +1101,7 @@ export type Database = {
         | "dismissed"
       liability_party: "client" | "technician" | "platform" | "split"
       liability_tier: "tier_1" | "tier_2" | "tier_3"
+      network_type: "wifi" | "cellular_4g" | "cellular_5g" | "unknown"
       payment_method: "upi" | "card" | "netbanking" | "cash"
       payment_status: "pending" | "processing" | "succeeded" | "failed"
       price_adjustment_reason:
@@ -1174,6 +1281,7 @@ export const Constants = {
       ],
       liability_party: ["client", "technician", "platform", "split"],
       liability_tier: ["tier_1", "tier_2", "tier_3"],
+      network_type: ["wifi", "cellular_4g", "cellular_5g", "unknown"],
       payment_method: ["upi", "card", "netbanking", "cash"],
       payment_status: ["pending", "processing", "succeeded", "failed"],
       price_adjustment_reason: [
