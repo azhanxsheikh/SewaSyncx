@@ -13,10 +13,7 @@
 -- and password as everyone else) — he's the idle technician the security
 -- test harness and the demo script's RLS check both rely on.
 --
--- Admin (super_admin) isn't seeded here: it needs the platform_staff table,
--- which doesn't exist yet — public.users has no admin role, by design (see
--- docs/DATABASE.md's rationale for keeping staff out of the shared users
--- table). Lands with that migration.
+-- Admin           (super_admin)    admin@sewasync.in                        AdminPassword@123
 --
 -- Scenarios (all for Abdullah, Flat 402, Tower B, Gaur City 2):
 --   A  pending   Plumbing SOS "Washroom pipe burst", high priority → Amit is the match
@@ -85,6 +82,32 @@ insert into public.saved_addresses (id, user_id, label, icon, address_line, area
 values ('5a5a5a5a-0000-4000-8000-000000000001', '11111111-1111-4111-8111-111111111111', 'Home', '🏠',
         'Flat 402, Tower B, Gaur City 2', 'Greater Noida West, UP 201009',
         st_point(77.4267, 28.6083, 4326)::geography, true);
+
+
+-- -----------------------------------------------------------------------------
+-- Admin (platform_staff, super_admin). No phone: staff signups skip that
+-- branch of handle_new_auth_user entirely (20260913000007_platform_staff.sql).
+-- -----------------------------------------------------------------------------
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, recovery_token, email_change_token_new, email_change,
+  email_change_token_current, phone_change, phone_change_token, reauthentication_token
+) values (
+  '00000000-0000-0000-0000-000000000000', '33333333-3333-4333-8333-333333333301', 'authenticated', 'authenticated',
+  'admin@sewasync.in', extensions.crypt('AdminPassword@123', extensions.gen_salt('bf')), now(),
+  '{"provider": "email", "providers": ["email"]}'::jsonb,
+  jsonb_build_object('name', 'SewaSync Admin', 'staff_role', 'super_admin'), now(), now(),
+  '', '', '', '', '', '', '', ''
+);
+
+insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+select gen_random_uuid(), u.id, u.id::text,
+       jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true, 'phone_verified', false),
+       'email', now(), now(), now()
+  from auth.users u
+ where u.id = '33333333-3333-4333-8333-333333333301';
 
 
 -- -----------------------------------------------------------------------------

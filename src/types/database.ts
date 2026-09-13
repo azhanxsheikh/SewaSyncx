@@ -36,6 +36,7 @@ export type Database = {
     Tables: {
       disputes: {
         Row: {
+          assigned_admin_id: string | null
           created_at: string
           description: string
           id: string
@@ -49,6 +50,7 @@ export type Database = {
           status: Database["public"]["Enums"]["dispute_status"]
         }
         Insert: {
+          assigned_admin_id?: string | null
           created_at?: string
           description: string
           id?: string
@@ -64,6 +66,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["dispute_status"]
         }
         Update: {
+          assigned_admin_id?: string | null
           created_at?: string
           description?: string
           id?: string
@@ -79,6 +82,13 @@ export type Database = {
           status?: Database["public"]["Enums"]["dispute_status"]
         }
         Relationships: [
+          {
+            foreignKeyName: "disputes_assigned_admin_id_fkey"
+            columns: ["assigned_admin_id"]
+            isOneToOne: false
+            referencedRelation: "platform_staff"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "disputes_initiator_id_fkey"
             columns: ["initiator_id"]
@@ -229,6 +239,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      platform_staff: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          staff_role: Database["public"]["Enums"]["staff_role"]
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id: string
+          name: string
+          staff_role?: Database["public"]["Enums"]["staff_role"]
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          staff_role?: Database["public"]["Enums"]["staff_role"]
+        }
+        Relationships: []
       }
       request_attachments: {
         Row: {
@@ -1193,6 +1227,7 @@ export type Database = {
         | "cancelled"
         | "declined"
         | "unfulfilled"
+      staff_role: "support_moderator" | "super_admin"
       status_event_reason:
         | "client_initiated"
         | "technician_honest"
@@ -1377,6 +1412,7 @@ export const Constants = {
         "declined",
         "unfulfilled",
       ],
+      staff_role: ["support_moderator", "super_admin"],
       status_event_reason: [
         "client_initiated",
         "technician_honest",

@@ -1,14 +1,16 @@
 /**
  * Real Supabase Auth session, shared by every surface (Client, Technician,
- * and — once platform_staff exists — Admin). Nothing in this app had a real
- * session before this: every RPC call authenticated as the anon key, so
- * auth.uid() was always null server-side regardless of what the UI did.
+ * Admin). Nothing in this app had a real session before this: every RPC
+ * call authenticated as the anon key, so auth.uid() was always null
+ * server-side regardless of what the UI did.
  *
- * `role` mirrors `public.users.role` ('client' | 'technician') for the
- * signed-in user, fetched once a session exists. It is `null` while
- * loading and while signed out — callers must not assume it is set just
- * because `status === 'signed-in'` (the profile fetch can still be in
- * flight, or can fail).
+ * `role` mirrors `public.users.role` ('client' | 'technician') and
+ * `staffRole` mirrors `public.platform_staff.staff_role` — a signed-in user
+ * has exactly one of the two set, never both (handle_new_auth_user routes
+ * each signup to one table or the other). Both are `null` while loading and
+ * while signed out — callers must not assume either is set just because
+ * `status === 'signed-in'` (the profile fetch can still be in flight, or
+ * can fail).
  */
 import {
   createContext,
@@ -24,12 +26,14 @@ import { supabase } from '../lib/supabaseClient';
 import type { Database } from '../types/database';
 
 type UserRole = Database['public']['Enums']['user_role'];
+type StaffRole = Database['public']['Enums']['staff_role'];
 
 export interface AuthState {
   status: 'loading' | 'signed-out' | 'signed-in';
   session: Session | null;
   userId: string | null;
   role: UserRole | null;
+  staffRole: StaffRole | null;
 }
 
 interface AuthContextValue extends AuthState {
@@ -39,53 +43,59 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>({
-    status: 'loading',
-    session: null,
-    userId: null,
-    role: null,
-  });
+const SIGNED_OUT_STATE: AuthState = {
+  status: 'signed-out',
+  session: null,
+  userId: null,
+  role: null,
+  staffRole: null,
+};
 
-  const loadRole = useCallback(async (userId: string): Promise<UserRole | null> => {
-    const { data, error } = await supabase.from('users').select('role').eq('id', userId).single();
-    if (error) {
-      console.warn('[auth] failed to load user role:', error.message);
-      return null;
-    }
-    return data.role;
-  }, []);
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<AuthState>({ ...SIGNED_OUT_STATE, status: 'loading' });
+
+  const loadProfile = useCallback(
+    async (userId: string): Promise<{ role: UserRole | null; staffRole: StaffRole | null }> => {
+      const [userRow, staffRow] = await Promise.all([
+        supabase.from('users').select('role').eq('id', userId).maybeSingle(),
+        supabase.from('platform_staff').select('staff_role').eq('id', userId).maybeSingle(),
+      ]);
+      if (userRow.error) console.warn('[auth] failed to load user role:', userRow.error.message);
+      if (staffRow.error) console.warn('[auth] failed to load staff role:', staffRow.error.message);
+      return {
+        role: userRow.data?.role ?? null,
+        staffRole: staffRow.data?.staff_role ?? null,
+      };
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (cancelled) return;
+    const applySession = async (session: Session | null) => {
       if (!session) {
-        setState({ status: 'signed-out', session: null, userId: null, role: null });
+        setState(SIGNED_OUT_STATE);
         return;
       }
-      const role = await loadRole(session.user.id);
+      const { role, staffRole } = await loadProfile(session.user.id);
       if (cancelled) return;
-      setState({ status: 'signed-in', session, userId: session.user.id, role });
+      setState({ status: 'signed-in', session, userId: session.user.id, role, staffRole });
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!cancelled) applySession(session);
     });
 
-    const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (cancelled) return;
-      if (!session) {
-        setState({ status: 'signed-out', session: null, userId: null, role: null });
-        return;
-      }
-      const role = await loadRole(session.user.id);
-      if (cancelled) return;
-      setState({ status: 'signed-in', session, userId: session.user.id, role });
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!cancelled) applySession(session);
     });
 
     return () => {
       cancelled = true;
       subscription.subscription.unsubscribe();
     };
-  }, [loadRole]);
+  }, [loadProfile]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });

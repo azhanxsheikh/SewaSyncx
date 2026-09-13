@@ -47,7 +47,7 @@ function AppInner() {
   // Resolved once per render from env/port/path, not component state: which
   // surface this build serves is fixed for its lifetime (see lib/appTarget).
   const target = getAppTarget();
-  const { status } = useAuth();
+  const { status, staffRole } = useAuth();
 
   const [screen, setScreen] = useState<Screen>('home');
   const [prevScreen, setPrevScreen] = useState<Screen>('home');
@@ -90,10 +90,21 @@ function AppInner() {
   }
 
   if (target === 'admin') {
-    // Staff-role verification (platform_staff) lands with the governance
-    // migration; for now, admin only requires any authenticated session.
     if (status === 'signed-out') {
       return <Login title="SewaSync Ops Console" subtitle="Staff sign-in" theme="dark" />;
+    }
+    if (!staffRole) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
+          <div className="max-w-sm rounded-2xl border border-slate-800 bg-slate-900 p-6 text-center">
+            <p className="font-display text-lg font-800 text-white">Not authorised</p>
+            <p className="mt-2 text-sm text-slate-400">
+              This account isn't registered as SewaSync staff. Sign in with a platform_staff
+              account to reach the Ops console.
+            </p>
+          </div>
+        </div>
+      );
     }
     return <AdminDashboard navigate={navigate} onBack={() => {}} />;
   }
