@@ -141,7 +141,7 @@ jobs:
     name: Supabase migrations and security lint
     needs: lint-and-typecheck
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -161,8 +161,28 @@ jobs:
       - name: Start local Supabase
         run: supabase start --exclude studio,imgproxy,edge-runtime,logflare,vector,mailpit,supavisor
 
+      # `db reset` restarts postgrest/realtime itself once every migration and
+      # the seed have applied, then immediately checks the API back through
+      # Kong — reproduced locally: that check can lose the race and the CLI
+      # aborts with "Error status 502: An invalid response was received from
+      # the upstream server" even though the reset itself fully succeeded.
+      # Retrying is safe (the command is idempotent) and, per the local repro,
+      # a Kong restart between attempts clears its stale upstream route.
       - name: Replay all migrations and seed from scratch
-        run: supabase db reset --local --yes
+        run: |
+          project_id="$(sed -n 's/^project_id = "\(.*\)"$/\1/p' supabase/config.toml)"
+          attempt=1
+          max_attempts=3
+          until supabase db reset --local --yes; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "::error::supabase db reset failed after $max_attempts attempts"
+              exit 1
+            fi
+            echo "::warning::supabase db reset failed (attempt $attempt/$max_attempts) — restarting Kong and retrying"
+            docker restart "supabase_kong_${project_id}" || true
+            sleep 5
+            attempt=$((attempt + 1))
+          done
 
       - name: Lint PL/pgSQL (public, private)
         run: supabase db lint --local --schema public,private --level warning --fail-on warning
