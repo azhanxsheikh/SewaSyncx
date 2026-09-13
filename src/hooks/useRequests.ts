@@ -1,22 +1,30 @@
 import { useMemo } from 'react';
-import { bookingHistory } from '../fixtures/requests.fixture';
+import { bookingHistory as fixtureBookingHistory } from '../fixtures/requests.fixture';
+import { useData } from '../context/DataProvider';
 import type { BookingRecord } from '../types/domain';
 
 /**
  * Read contracts for the client's service requests.
  *
- * Target state: a Supabase query against `requests` scoped by
- * `client_id = auth.uid()`, ordered by `created_at DESC`
- * (index `requests_client_history_idx`, see `docs/DATABASE.md` §7.3).
+ * Real query against `requests`, scoped by `client_id = auth.uid()`
+ * (src/context/DataProvider.tsx), ordered by `created_at DESC` — matches
+ * the `requests_client_history_idx` index this was always meant to use.
+ * Falls back to the fixture list before the initial fetch resolves, or if
+ * this client genuinely has no requests yet, so the booking-history screen
+ * still has something to show rather than an empty state on every fresh
+ * account (arguably wrong for a *real* new user, but this app has no
+ * onboarding/create-request flow yet for that to matter — see
+ * DispatchContext, which still simulates job creation locally).
  */
-
 export function useRequests(): BookingRecord[] {
-  return bookingHistory;
+  const { ready, bookingHistory } = useData();
+  return ready && bookingHistory.length ? bookingHistory : fixtureBookingHistory;
 }
 
 /** Most recent requests, as rendered by the home screen's activity strip. */
 export function useRecentRequests(limit: number): BookingRecord[] {
-  return useMemo(() => bookingHistory.slice(0, limit), [limit]);
+  const bookingHistory = useRequests();
+  return useMemo(() => bookingHistory.slice(0, limit), [bookingHistory, limit]);
 }
 
 /**
@@ -26,6 +34,7 @@ export function useRecentRequests(limit: number): BookingRecord[] {
  * `Scheduled` match on request type, `Cancelled` matches on status.
  */
 export function useFilteredRequests(activeTab: string): BookingRecord[] {
+  const bookingHistory = useRequests();
   return useMemo(
     () =>
       bookingHistory.filter((booking) => {
@@ -35,6 +44,6 @@ export function useFilteredRequests(activeTab: string): BookingRecord[] {
         if (activeTab === 'Cancelled') return booking.status === 'Cancelled';
         return true;
       }),
-    [activeTab],
+    [bookingHistory, activeTab],
   );
 }

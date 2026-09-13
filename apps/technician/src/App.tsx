@@ -2,6 +2,7 @@ import TechnicianPortal from '../../../src/screens/TechnicianPortal'
 import Login from '../../../src/components/Login'
 import { DispatchProvider } from '../../../src/context/DispatchContext'
 import { AuthProvider, useAuth } from '../../../src/context/AuthContext'
+import { DataProvider } from '../../../src/context/DataProvider'
 
 function TechnicianAppInner() {
   const { status } = useAuth()
@@ -21,7 +22,9 @@ function TechnicianAppInner() {
 export default function TechnicianApp() {
   return (
     <AuthProvider>
-      <TechnicianAppInner />
+      <DataProvider>
+        <TechnicianAppInner />
+      </DataProvider>
     </AuthProvider>
   )
 }

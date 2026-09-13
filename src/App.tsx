@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import type { Screen } from './types/navigation';
 
 import Home from './screens/Home';
@@ -29,6 +29,7 @@ import AdminDashboard from './components/admin/AdminDashboard';
 import Login from './components/Login';
 import { DispatchProvider } from './context/DispatchContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { DataProvider, useData } from './context/DataProvider';
 import SOSRouteErrorBoundary from './components/SOSRouteErrorBoundary';
 import { getAppTarget } from './lib/appTarget';
 
@@ -38,7 +39,9 @@ type ScheduledSubScreen = 'category' | 'service' | 'datetime' | 'address' | 'pri
 export default function App() {
   return (
     <AuthProvider>
-      <AppInner />
+      <DataProvider>
+        <AppInner />
+      </DataProvider>
     </AuthProvider>
   );
 }
@@ -72,6 +75,18 @@ function AppInner() {
     if (scheduledMap[s]) setScheduledSubScreen(scheduledMap[s]!);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Real request completion (Realtime, DataProvider) auto-navigates to the
+  // invoice screen. DigitalInvoice.tsx itself still renders from
+  // DispatchContext's own job state, not this real row — see
+  // DataProvider.tsx's justCompletedRequestId comment for that boundary.
+  const { justCompletedRequestId, clearJustCompleted } = useData();
+  useEffect(() => {
+    if (!justCompletedRequestId) return;
+    navigate('sos-invoice');
+    clearJustCompleted();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [justCompletedRequestId, clearJustCompleted]);
 
   const goBack = () => {
     navigate(prevScreen);
