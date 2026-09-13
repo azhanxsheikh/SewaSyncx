@@ -30,10 +30,19 @@ export default function IncomingAlert({
     return () => window.clearInterval(timer)
   }, [isAlert])
 
+  // A different request (or none — e.g. claimed elsewhere while its drawer was
+  // open): never carry the previous alert's open drawer or error over to it.
+  useEffect(() => {
+    setIsDrawerOpen(false)
+    setAcceptError(null)
+  }, [alertId])
+
   useEffect(() => {
     if (seconds === 0 && alertId) {
       setIsDrawerOpen(false)
-      decline(alertId)
+      // Letting the window lapse is not a decision about the job, so it is
+      // hidden for this session only — no dismissal row.
+      void decline(alertId, { persist: false })
     }
   }, [seconds, alertId, decline])
 
@@ -58,7 +67,8 @@ export default function IncomingAlert({
 
   const handleDecline = () => {
     setIsDrawerOpen(false)
-    decline(job.id)
+    // Persists a private dismissal: it stays gone after a reload.
+    void decline(job.id)
   }
 
   return (

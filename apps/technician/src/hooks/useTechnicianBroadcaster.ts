@@ -26,8 +26,19 @@ export interface BroadcasterState {
   toggleSimulation: () => void;
 }
 
-// Greater Noida coordinates for local dev simulation
-const START_SIMULATION_COORDS: Coordinates = { latitude: 28.4727, longitude: 77.4893 }; // Knowledge Park III
+function envCoordinate(value: string | undefined, fallback: number): number {
+  const parsed = value ? Number(value) : Number.NaN;
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+// Greater Noida coordinates for local dev simulation (localhost without GPS).
+// Starts at Amit Singh's seeded position in Gaur City, ~1.2 km from the Gaur
+// City 2 demo requests, so the simulated technician stays inside their 10 km
+// dispatch radius. Override with VITE_DEV_TECH_LAT / VITE_DEV_TECH_LNG.
+const START_SIMULATION_COORDS: Coordinates = {
+  latitude: envCoordinate(import.meta.env.VITE_DEV_TECH_LAT, 28.6105),
+  longitude: envCoordinate(import.meta.env.VITE_DEV_TECH_LNG, 77.432),
+};
 const DEFAULT_CLIENT_COORDS: Coordinates = { latitude: 28.6083, longitude: 77.4267 }; // Gaur City 2, Greater Noida West
 
 function calculateHeading(lat1: number, lon1: number, lat2: number, lon2: number): number {

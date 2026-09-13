@@ -30,10 +30,64 @@ export interface ActiveJobProps {
 
 export default function ActiveJob({ onOpenAlerts }: ActiveJobProps) {
   const { job } = useDispatch()
-  const { advance, settle, mutating, error, notice } = useActiveTechnicianJob()
+  const { advance, settle, mutating, error, notice, completedJob, dismissCompletedJob } = useActiveTechnicianJob()
   const [showCompletionModal, setShowCompletionModal] = useState(false)
 
-  if (!job || !["accepted", "en-route", "en_route", "arrived", "in-progress", "in_progress"].includes(job.status)) {
+  // Settled in this session: the request is already `completed` server-side,
+  // so this summary is held in ActiveTechnicianJobContext until closed.
+  if (completedJob) {
+    const settledAmount = completedJob.finalPrice ?? completedJob.estimatedTotal
+    return (
+      <div className="mx-auto max-w-xl py-6 px-4">
+        <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-8 sm:p-12 text-center shadow-xl backdrop-blur-sm">
+          <div className="relative mx-auto mb-6 flex h-20 w-20 items-center justify-center">
+            <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-500/10">
+              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            </span>
+          </div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs font-semibold mb-3">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            <span>Payment settled · {formatJobId(completedJob.id)}</span>
+          </div>
+          <h2 className="font-display text-2xl font-800 text-white tracking-tight">
+            Job Complete
+          </h2>
+          <p className="mt-2 text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+            <span className="capitalize">{completedJob.service.replace("-", " ")}</span> emergency for {completedJob.customerName}
+          </p>
+          <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-5 text-left">
+            <p className="text-xs text-slate-500">Final settled amount</p>
+            <p className="mt-2 font-display text-2xl font-800">₹{settledAmount}</p>
+            {settledAmount !== completedJob.estimatedTotal && (
+              <p className="mt-1 text-xs text-slate-400">
+                Estimate ₹{completedJob.estimatedTotal}
+                {completedJob.priceAdjustmentReason ? ` · Adjusted (${completedJob.priceAdjustmentReason.replace(/_/g, " ")})` : ""}
+              </p>
+            )}
+          </div>
+          {completedJob.priceAdjustmentNotes && (
+            <div className="mt-3 mb-4 rounded-2xl border border-amber-500/30 bg-amber-950/40 p-4 text-left shadow-sm">
+              <p className="text-xs text-slate-500">Adjustment notes</p>
+              <p className="mt-1.5 text-sm text-amber-100 font-medium leading-relaxed">{completedJob.priceAdjustmentNotes}</p>
+            </div>
+          )}
+          <div className="mt-6">
+            <button
+              type="button"
+              onClick={dismissCompletedJob}
+              className="w-full rounded-xl bg-emerald-500 py-3 font-700 text-white"
+            >
+              Close & Return to Standby
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (!job ||!["accepted", "en-route", "en_route", "arrived", "in-progress", "in_progress"].includes(job.status)) {
     return (
       <div className="mx-auto max-w-xl py-6 px-4">
         <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-8 sm:p-12 text-center shadow-xl backdrop-blur-sm">

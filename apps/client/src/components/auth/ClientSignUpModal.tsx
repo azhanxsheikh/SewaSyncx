@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { supabase } from '../../../../../packages/shared/src/lib/supabase';
+import { extractValidIndianPhone } from '../../../../../packages/shared/src/lib/phone';
 
 export interface ClientSignUpModalProps {
   isOpen: boolean;
@@ -29,8 +30,8 @@ export function ClientSignUpModal({ isOpen, onClose, onSuccess }: ClientSignUpMo
   if (!isOpen) return null;
 
   // Phone validation: Indian mobile starts with 6-9 and has 10 digits
-  const cleanDigits = phone.replace(/\D/g, '').replace(/^91/, '');
-  const isPhoneValid = /^[6-9]\d{9}$/.test(cleanDigits);
+  const phoneCheck = extractValidIndianPhone(phone);
+  const isPhoneValid = phoneCheck.isValid;
   const isPasswordValid = password.length >= 8;
   const isNameValid = fullName.trim().length >= 3;
 
@@ -43,8 +44,9 @@ export function ClientSignUpModal({ isOpen, onClose, onSuccess }: ClientSignUpMo
       return;
     }
 
-    if (!isPhoneValid) {
-      setError('Please provide a valid 10-digit Indian mobile number (starts with 6-9).');
+    const phoneValidation = extractValidIndianPhone(phone);
+    if (!phoneValidation.isValid) {
+      setError(phoneValidation.error || 'Please enter a valid 10-digit Indian mobile number (starts with 6-9).');
       return;
     }
 
@@ -58,7 +60,7 @@ export function ClientSignUpModal({ isOpen, onClose, onSuccess }: ClientSignUpMo
       return;
     }
 
-    const formattedE164Phone = `+91${cleanDigits}`;
+    setError(null);
     setSubmitting(true);
 
     try {
@@ -71,7 +73,7 @@ export function ClientSignUpModal({ isOpen, onClose, onSuccess }: ClientSignUpMo
             role: 'client',
             full_name: fullName.trim(),
             name: fullName.trim(),
-            phone: formattedE164Phone,
+            phone: phoneValidation.e164Phone,
           },
         },
       });
@@ -106,7 +108,7 @@ export function ClientSignUpModal({ isOpen, onClose, onSuccess }: ClientSignUpMo
       try {
         await supabase.rpc('complete_profile', {
           p_name: fullName.trim(),
-          p_phone: formattedE164Phone,
+          p_phone: phoneValidation.e164Phone,
         });
       } catch (profErr) {
         console.warn('[signup] complete_profile sync attempt:', profErr);
@@ -278,9 +280,12 @@ export function ClientSignUpModal({ isOpen, onClose, onSuccess }: ClientSignUpMo
                     type="tel"
                     required
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      if (error) setError(null);
+                    }}
                     placeholder="98765 43210"
-                    maxLength={10}
+                    maxLength={15}
                     className="w-full px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none"
                   />
                 </div>

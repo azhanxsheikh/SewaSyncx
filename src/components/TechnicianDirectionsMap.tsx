@@ -47,7 +47,11 @@ export default function TechnicianDirectionsMap({
     const defaultCenter: [number, number] = serviceCoordinates
       ? [serviceLatitude!, serviceLongitude!]
       : [28.608, 77.437]
-    const map = L.map(mapElement.current, { zoomControl: false }).setView(defaultCenter, 13)
+    // Preview opens at its final zoom. Created at 13, the marker effect's
+    // setView(…, 14) started a 250 ms zoom animation whose timer Leaflet 1.9
+    // does not cancel on remove(): closing the drawer inside that window (an
+    // alert claimed elsewhere, a quick accept) threw `_leaflet_pos` errors.
+    const map = L.map(mapElement.current, { zoomControl: false }).setView(defaultCenter, mode === "preview" ? 14 : 13)
     L.control.zoom({ position: "bottomright" }).addTo(map)
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "&copy; OpenStreetMap contributors",
@@ -60,7 +64,7 @@ export default function TechnicianDirectionsMap({
       map.remove()
       mapRef.current = null
     }
-  }, [serviceLatitude, serviceLongitude, serviceCoordinates])
+  }, [serviceLatitude, serviceLongitude, serviceCoordinates, mode])
 
   useEffect(() => {
     if (!mapRef.current || !serviceCoordinates) return

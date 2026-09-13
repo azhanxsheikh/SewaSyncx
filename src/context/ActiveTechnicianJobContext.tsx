@@ -46,6 +46,11 @@ const ACTIVE_STATUSES: RequestStatus[] = ['accepted', 'en_route', 'arrived', 'in
 const TERMINAL_STATUSES: RequestStatus[] = ['completed', 'cancelled', 'declined', 'unfulfilled'];
 const REQUEST_SELECT =
   '*, service_categories(slug, name), client:client_id(name, phone), family_member:family_member_id(name, relation, phone)';
+// Pending feed: RLS on request_technician_dismissals returns only this
+// technician's rows, so filtering the embed to null excludes what they passed on.
+const PENDING_SELECT = `${REQUEST_SELECT}, request_technician_dismissals(technician_id)`;
+/** Private broadcast topic announcing pending requests that left the feed. */
+const DISPATCH_PENDING_TOPIC = 'dispatch:pending';
 
 /** Alert response window shown by IncomingAlert. */
 export const ALERT_WINDOW_SECONDS = 45;
@@ -132,9 +137,17 @@ interface ActiveTechnicianJobValue {
   clearMessages: () => void;
   refresh: () => Promise<void>;
   accept: (requestId: string) => Promise<void>;
-  decline: (requestId: string) => void;
+  /**
+   * Stop offering a pending request to this technician. `persist` (default)
+   * records a private dismissal so it stays gone after a reload; an alert
+   * that merely timed out passes `persist: false`.
+   */
+  decline: (requestId: string, options?: { persist?: boolean }) => Promise<void>;
   advance: (next: ConsoleTransition) => Promise<boolean>;
   settle: (finalPrice: number, reason?: PriceAdjustmentReason, notes?: string) => Promise<boolean>;
+  /** The job this session just settled, until the technician closes its summary. */
+  completedJob: DispatchJob | null;
+  dismissCompletedJob: () => void;
   /** Epoch ms when the alert window for a request closes (fixed on first sight). */
   alertDeadline: (requestId: string) => number;
 }
@@ -143,7 +156,7 @@ const ActiveTechnicianJobContext = createContext<ActiveTechnicianJobValue | null
 
 export function ActiveTechnicianJobProvider({ children }: { children: ReactNode }) {
   const { userId, role } = useAuth();
-  const { job, replaceJob, updateJob, declineJob } = useDispatch();
+  const { job, replaceJob, updateJob } = useDispatch();
 
   const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
   const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
@@ -151,14 +164,24 @@ export function ActiveTechnicianJobProvider({ children }: { children: ReactNode 
   const [mutating, setMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [completedJob, setCompletedJob] = useState<DispatchJob | null>(null);
 
   const jobRef = useRef(job);
   jobRef.current = job;
   const refreshSeq = useRef(0);
+  // Hidden this session: timed-out alerts, and declines while their
+  // dismissal row is still being written.
   const declinedIds = useRef(new Set<string>());
   const alertSeenAt = useRef(new Map<string, number>());
 
   const techId = role === 'technician' ? userId : null;
+
+  // A different (or no) technician signed in: nothing carries over.
+  useEffect(() => {
+    declinedIds.current.clear();
+    alertSeenAt.current.clear();
+    setCompletedJob(null);
+  }, [techId]);
 
   const refresh = useCallback(async () => {
     if (!techId) return;
@@ -182,6 +205,10 @@ export function ActiveTechnicianJobProvider({ children }: { children: ReactNode 
 
     const active = (activeRows as unknown as RequestWithJoins[] | null)?.[0];
     if (active) {
+      // A live job (e.g. accepted on another device) outranks a settlement
+      // summary still on screen. Never the settled job itself: completed is
+      // not an active status, and settle() supersedes any older refresh.
+      setCompletedJob(null);
       setActiveRequestId(active.id);
       setPendingRequestId(null);
       replaceJob(mapRequestToJob(active));
@@ -191,12 +218,14 @@ export function ActiveTechnicianJobProvider({ children }: { children: ReactNode 
     setActiveRequestId(null);
 
     // RLS (requests_select_eligible_technician) limits this to pending
-    // requests in the technician's categories, radius and verification.
+    // requests in the technician's categories, radius and verification;
+    // requests they dismissed are excluded server-side.
     const { data: pendingRows, error: pendingErr } = await supabase
       .from('requests')
-      .select(REQUEST_SELECT)
+      .select(PENDING_SELECT)
       .eq('status', 'pending')
       .is('technician_id', null)
+      .is('request_technician_dismissals', null)
       .order('created_at', { ascending: false })
       .limit(10);
     if (seq !== refreshSeq.current) return;
@@ -210,10 +239,9 @@ export function ActiveTechnicianJobProvider({ children }: { children: ReactNode 
       if (!alertSeenAt.current.has(pending.id)) alertSeenAt.current.set(pending.id, Date.now());
       replaceJob(mapRequestToJob(pending));
     } else {
-      // Nothing active or offered: the console returns to standby. This
-      // includes a just-settled job (ActiveJob renders standby for any
-      // non-active status), whichever of the settle RPC response or its
-      // Realtime event arrives first.
+      // Nothing active or offered: standby. A job this session just settled
+      // stays on screen as completedJob until the technician closes it,
+      // whichever of the settle RPC response or its Realtime event lands first.
       setPendingRequestId(null);
       replaceJob(null);
     }
@@ -236,6 +264,7 @@ export function ActiveTechnicianJobProvider({ children }: { children: ReactNode 
         }
         setActiveRequestId(requestId);
         setPendingRequestId(null);
+        setCompletedJob(null);
         await refresh();
       } finally {
         setMutating(false);
@@ -245,14 +274,23 @@ export function ActiveTechnicianJobProvider({ children }: { children: ReactNode 
   );
 
   const decline = useCallback(
-    (requestId: string) => {
+    async (requestId: string, options?: { persist?: boolean }) => {
       // Declining a broadcast is private to this technician (CLAUDE.md §4.5):
-      // no server state changes, the request just stops being offered here.
+      // a dismissal row, never a change to the request. Hide it locally at
+      // once — without publishing a "declined" job to other surfaces.
       declinedIds.current.add(requestId);
-      declineJob();
-      void refresh();
+      if (jobRef.current?.id === requestId) {
+        setPendingRequestId(null);
+        replaceJob(null);
+      }
+      if (techId && options?.persist !== false) {
+        const { error: rpcErr } = await supabase.rpc('dismiss_request', { p_request_id: requestId });
+        // Still hidden for this session; it may be offered again after a reload.
+        if (rpcErr) console.warn('[technician] dismiss_request failed:', rpcErr.message);
+      }
+      await refresh();
     },
-    [declineJob, refresh],
+    [techId, replaceJob, refresh],
   );
 
   const advance = useCallback(
@@ -287,10 +325,13 @@ export function ActiveTechnicianJobProvider({ children }: { children: ReactNode 
     async (finalPrice: number, reason?: PriceAdjustmentReason, notes?: string) => {
       const requestId = activeRequestId;
       if (!requestId) return false;
+      // Captured before the call: the request's Realtime "completed" event can
+      // trigger a refresh that replaces the job before the RPC resolves.
+      const settling = jobRef.current?.id === requestId ? jobRef.current : null;
       setMutating(true);
       setError(null);
       try {
-        const { error: rpcErr } = await supabase.rpc('settle_job_payment', {
+        const { data, error: rpcErr } = await supabase.rpc('settle_job_payment', {
           p_request_id: requestId,
           p_final_price: finalPrice,
           ...(reason ? { p_reason: reason } : {}),
@@ -301,13 +342,16 @@ export function ActiveTechnicianJobProvider({ children }: { children: ReactNode 
           await refresh();
           return false;
         }
-        updateJob({
-          finalPrice,
-          priceAdjustmentReason: reason,
-          priceAdjustmentNotes: notes || undefined,
+        const settled = (data as { request?: RequestRow } | null)?.request;
+        const patch: Partial<DispatchJob> = {
+          finalPrice: settled?.final_price != null ? Number(settled.final_price) : finalPrice,
+          priceAdjustmentReason: settled ? (settled.price_adjustment_reason ?? undefined) : reason,
+          priceAdjustmentNotes: settled ? (settled.price_adjustment_notes ?? undefined) : notes || undefined,
           status: 'completed',
           executionStep: 'completed',
-        });
+        };
+        if (settling) setCompletedJob({ ...settling, ...patch, updatedAt: Date.now() });
+        if (jobRef.current?.id === requestId) updateJob(patch);
         setActiveRequestId(null);
         void refresh();
         return true;
@@ -331,6 +375,8 @@ export function ActiveTechnicianJobProvider({ children }: { children: ReactNode 
     setError(null);
     setNotice(null);
   }, []);
+
+  const dismissCompletedJob = useCallback(() => setCompletedJob(null), []);
 
   // Initial load, and resync whenever the tab becomes visible again.
   useEffect(() => {
@@ -366,6 +412,31 @@ export function ActiveTechnicianJobProvider({ children }: { children: ReactNode 
       void supabase.removeChannel(channel);
     };
   }, [techId, refresh]);
+
+  // A pending request that another technician claimed (or the client
+  // withdrew) stops being readable here, so Realtime's RLS check never
+  // delivers its UPDATE. The database announces the id on a private topic
+  // (announce_request_unavailable); evict it at once, then re-read the feed.
+  useEffect(() => {
+    if (!techId) return;
+    const channel = supabase
+      .channel(DISPATCH_PENDING_TOPIC, { config: { private: true } })
+      .on('broadcast', { event: 'request_unavailable' }, ({ payload }) => {
+        const requestId = (payload as { request_id?: string } | undefined)?.request_id;
+        if (!requestId) return;
+        alertSeenAt.current.delete(requestId);
+        const current = jobRef.current;
+        if (current?.id === requestId && current.status === 'requested') {
+          setPendingRequestId(null);
+          replaceJob(null);
+        }
+        void refresh();
+      })
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [techId, replaceJob, refresh]);
 
   // The active request itself: client cancellations and any status change
   // made outside this tab arrive here immediately.
@@ -422,9 +493,11 @@ export function ActiveTechnicianJobProvider({ children }: { children: ReactNode 
       decline,
       advance,
       settle,
+      completedJob,
+      dismissCompletedJob,
       alertDeadline,
     }),
-    [activeRequestId, pendingRequestId, loading, mutating, error, notice, clearMessages, refresh, accept, decline, advance, settle, alertDeadline],
+    [activeRequestId, pendingRequestId, loading, mutating, error, notice, clearMessages, refresh, accept, decline, advance, settle, completedJob, dismissCompletedJob, alertDeadline],
   );
 
   return <ActiveTechnicianJobContext.Provider value={value}>{children}</ActiveTechnicianJobContext.Provider>;

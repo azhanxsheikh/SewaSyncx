@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent, type ChangeEvent } from 'react';
 import { supabase } from '../../../../../packages/shared/src/lib/supabase';
+import { extractValidIndianPhone } from '../../../../../packages/shared/src/lib/phone';
 
 export interface TechnicianSignUpModalProps {
   isOpen: boolean;
@@ -94,8 +95,8 @@ export function TechnicianSignUpModal({ isOpen, onClose, onSuccess }: Technician
   if (!isOpen) return null;
 
   // Validation helpers
-  const cleanDigits = phone.replace(/\D/g, '').replace(/^91/, '');
-  const isPhoneValid = /^[6-9]\d{9}$/.test(cleanDigits);
+  const phoneCheck = extractValidIndianPhone(phone);
+  const isPhoneValid = phoneCheck.isValid;
   const isPasswordValid = password.length >= 8;
   const isNameValid = fullName.trim().length >= 3;
 
@@ -133,10 +134,12 @@ export function TechnicianSignUpModal({ isOpen, onClose, onSuccess }: Technician
       setError('Password must be at least 8 characters long.');
       return;
     }
-    if (!isPhoneValid) {
-      setError('Please enter a valid 10-digit Indian mobile number (e.g., 98223 34455).');
+    const check = extractValidIndianPhone(phone);
+    if (!check.isValid) {
+      setError(check.error || 'Please enter a valid 10-digit Indian mobile number (starts with 6-9).');
       return;
     }
+    setError(null);
     setCurrentStep(2);
   };
 
@@ -157,7 +160,12 @@ export function TechnicianSignUpModal({ isOpen, onClose, onSuccess }: Technician
     e.preventDefault();
     setError(null);
 
-    const formattedE164Phone = `+91${cleanDigits}`;
+    const check = extractValidIndianPhone(phone);
+    if (!check.isValid) {
+      setError(check.error || 'Please enter a valid 10-digit Indian mobile number (starts with 6-9).');
+      return;
+    }
+    setError(null);
     setSubmitting(true);
 
     try {
@@ -170,7 +178,7 @@ export function TechnicianSignUpModal({ isOpen, onClose, onSuccess }: Technician
             role: 'technician',
             full_name: fullName.trim(),
             name: fullName.trim(),
-            phone: formattedE164Phone,
+            phone: check.e164Phone,
           },
         },
       });
@@ -214,7 +222,7 @@ export function TechnicianSignUpModal({ isOpen, onClose, onSuccess }: Technician
         if (rpcErr) {
           console.warn('[signup] register_technician_profile RPC message:', rpcErr.message);
           // Fallback direct inserts if RPC had unexpected error
-          await supabase.from('users').update({ role: 'technician' } as any).eq('id', createdUser.id);
+          await supabase.from('users').update({ role: 'technician', phone: check.e164Phone } as any).eq('id', createdUser.id);
           await supabase.from('technician_profiles').insert({
             id: createdUser.id,
             vehicle_type: vehicleType,
@@ -434,9 +442,12 @@ export function TechnicianSignUpModal({ isOpen, onClose, onSuccess }: Technician
                           type="tel"
                           required
                           value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
+                          onChange={(e) => {
+                            setPhone(e.target.value);
+                            if (error) setError(null);
+                          }}
                           placeholder="98223 34455"
-                          maxLength={10}
+                          maxLength={15}
                           className="w-full px-3.5 py-2.5 text-sm text-white bg-transparent placeholder-slate-500 focus:outline-none"
                         />
                       </div>

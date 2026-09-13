@@ -451,6 +451,39 @@ export type Database = {
           },
         ]
       }
+      request_technician_dismissals: {
+        Row: {
+          dismissed_at: string
+          request_id: string
+          technician_id: string
+        }
+        Insert: {
+          dismissed_at?: string
+          request_id: string
+          technician_id: string
+        }
+        Update: {
+          dismissed_at?: string
+          request_id?: string
+          technician_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_technician_dismissals_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_technician_dismissals_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       requests: {
         Row: {
           accepted_at: string | null
@@ -1195,6 +1228,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      dismiss_request: { Args: { p_request_id: string }; Returns: undefined }
       get_nearby_matching_technicians: {
         Args: { p_radius_meters: number; p_request_id: string }
         Returns: {
