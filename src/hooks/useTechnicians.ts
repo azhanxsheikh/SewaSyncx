@@ -25,5 +25,5 @@ export { usePrimaryTechnician, useTechnicianProfile } from './useTechnicianProfi
  */
 export function useTechnicianJobHistory(): TechnicianJobRecord[] {
   const { ready, technicianJobHistory } = useData();
-  return ready && technicianJobHistory.length ? technicianJobHistory : fixtureTechnicianJobHistory;
+  return ready ? technicianJobHistory : [];
 }

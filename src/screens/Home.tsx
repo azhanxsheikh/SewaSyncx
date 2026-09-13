@@ -7,6 +7,7 @@ import {
 import { useServiceCategories } from '../hooks/useServiceCatalog';
 import { useClientProfile, useFamilyMembers, useUnreadNotificationsCount } from '../hooks/useAccount';
 import { useRecentRequests } from '../hooks/useRequests';
+import { useData } from '../context/DataProvider';
 import BottomNav from '../components/BottomNav';
 
 interface HomeProps {
@@ -15,6 +16,7 @@ interface HomeProps {
 
 export default function Home({ navigate }: HomeProps) {
   const profile = useClientProfile();
+  const { currentRequest } = useData();
   const serviceCategories = useServiceCategories();
   const familyMembers = useFamilyMembers();
   const recentBookings = useRecentRequests(2);
@@ -50,7 +52,7 @@ export default function Home({ navigate }: HomeProps) {
               onClick={() => navigate('profile')}
               className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center"
             >
-              <span className="text-blue-700 font-display font-700 text-sm">A</span>
+              <span className="text-blue-700 font-display font-700 text-sm">{profile.initial || 'U'}</span>
             </button>
           </div>
         </div>
@@ -97,23 +99,25 @@ export default function Home({ navigate }: HomeProps) {
         </div>
 
         {/* Active booking if any */}
-        <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-lg">❄️</div>
-              <div>
-                <p className="font-display font-600 text-gray-900 text-sm">AC Service booked</p>
-                <p className="text-xs text-gray-500">Tomorrow · 10:00 AM · Amit Singh</p>
+        {currentRequest && (
+          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-lg">❄️</div>
+                <div>
+                  <p className="font-display font-600 text-gray-900 text-sm">Active Booking</p>
+                  <p className="text-xs text-gray-500">{currentRequest.address_line || 'Service in progress'}</p>
+                </div>
               </div>
+              <button
+                onClick={() => navigate('bookings')}
+                className="text-blue-600 text-xs font-600 bg-blue-100 px-3 py-1.5 rounded-lg hover:bg-blue-200 transition-colors"
+              >
+                Track
+              </button>
             </div>
-            <button
-              onClick={() => navigate('bookings')}
-              className="text-blue-600 text-xs font-600 bg-blue-100 px-3 py-1.5 rounded-lg hover:bg-blue-200 transition-colors"
-            >
-              Track
-            </button>
           </div>
-        </div>
+        )}
 
         {/* Service Categories */}
         <div>

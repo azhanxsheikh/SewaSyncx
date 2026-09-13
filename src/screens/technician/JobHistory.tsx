@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { technicianHistoryFilters } from '../../fixtures/technicians.fixture';
-import { useTechnicianJobHistory } from '../../hooks/useTechnicians';
+import { useTechnicianHistory } from '../../hooks/useTechnicianHistory';
 import { formatJobId } from './ActiveJob';
 
 export default function JobHistory() {
-  const history = useTechnicianJobHistory();
+  const { history } = useTechnicianHistory();
   const [filter, setFilter] = useState('All');
   const filtered = history.filter(item => filter === 'All' || item.status === filter);
   return (

@@ -18,7 +18,7 @@ import type { BookingRecord } from '../types/domain';
  */
 export function useRequests(): BookingRecord[] {
   const { ready, bookingHistory } = useData();
-  return ready && bookingHistory.length ? bookingHistory : fixtureBookingHistory;
+  return ready ? bookingHistory : [];
 }
 
 /** Most recent requests, as rendered by the home screen's activity strip. */
