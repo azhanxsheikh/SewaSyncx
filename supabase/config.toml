@@ -118,6 +118,14 @@ file_size_limit = "50MiB"
 # allowed_mime_types = ["image/png", "image/jpeg"]
 # objects_path = "./images"
 
+# Evidence media (DATABASE §13). The bucket itself is created by migration
+# 20260913000001; this entry uploads the demo photos for seed Scenario C.
+[storage.buckets.sos-media]
+public = false
+file_size_limit = "50MiB"
+allowed_mime_types = ["image/*", "video/*"]
+objects_path = "./seed/sos-media"
+
 # Allow connections via S3 compatible clients
 [storage.s3_protocol]
 enabled = true

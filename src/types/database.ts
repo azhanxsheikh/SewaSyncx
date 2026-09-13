@@ -230,6 +230,66 @@ export type Database = {
           },
         ]
       }
+      request_attachments: {
+        Row: {
+          captured_at: string | null
+          created_at: string
+          exif_lat: number | null
+          exif_lng: number | null
+          file_name: string | null
+          id: string
+          kind: Database["public"]["Enums"]["attachment_kind"]
+          phase: Database["public"]["Enums"]["attachment_phase"]
+          phash: unknown
+          request_id: string
+          storage_path: string
+          uploaded_by: string
+        }
+        Insert: {
+          captured_at?: string | null
+          created_at?: string
+          exif_lat?: number | null
+          exif_lng?: number | null
+          file_name?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["attachment_kind"]
+          phase: Database["public"]["Enums"]["attachment_phase"]
+          phash?: unknown
+          request_id: string
+          storage_path: string
+          uploaded_by: string
+        }
+        Update: {
+          captured_at?: string | null
+          created_at?: string
+          exif_lat?: number | null
+          exif_lng?: number | null
+          file_name?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["attachment_kind"]
+          phase?: Database["public"]["Enums"]["attachment_phase"]
+          phash?: unknown
+          request_id?: string
+          storage_path?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_attachments_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       request_cost_additions: {
         Row: {
           amount: number
@@ -1082,6 +1142,8 @@ export type Database = {
     }
     Enums: {
       actor_role: "client" | "technician" | "system" | "admin"
+      attachment_kind: "image" | "video"
+      attachment_phase: "pre_work" | "post_work"
       cost_addition_status: "pending" | "approved" | "declined"
       dispute_reason:
         | "price_dispute"
@@ -1260,6 +1322,8 @@ export const Constants = {
   public: {
     Enums: {
       actor_role: ["client", "technician", "system", "admin"],
+      attachment_kind: ["image", "video"],
+      attachment_phase: ["pre_work", "post_work"],
       cost_addition_status: ["pending", "approved", "declined"],
       dispute_reason: [
         "price_dispute",
