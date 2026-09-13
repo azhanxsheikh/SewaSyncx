@@ -28,11 +28,16 @@ import Notifications from './screens/Notifications';
 import AdminDashboard from './components/admin/AdminDashboard';
 import { DispatchProvider } from './context/DispatchContext';
 import SOSRouteErrorBoundary from './components/SOSRouteErrorBoundary';
+import { getAppTarget } from './lib/appTarget';
 
 type FamilySubScreen = 'list' | 'member' | 'tracking';
 type ScheduledSubScreen = 'category' | 'service' | 'datetime' | 'address' | 'pricing' | 'confirmation';
 
 export default function App() {
+  // Resolved once per render from env/port/path, not component state: which
+  // surface this build serves is fixed for its lifetime (see lib/appTarget).
+  const target = getAppTarget();
+
   const [screen, setScreen] = useState<Screen>('home');
   const [prevScreen, setPrevScreen] = useState<Screen>('home');
   const [selectedService, setSelectedService] = useState('electrical');
@@ -60,6 +65,18 @@ export default function App() {
   const goBack = () => {
     navigate(prevScreen);
   };
+
+  // Standalone Admin deployment (pnpm dev:admin / build:admin, or an /admin
+  // path on a combined deployment — see lib/appTarget): render the Ops
+  // console directly, without the client screen router or its
+  // BroadcastChannel/localStorage dispatch bridge. This is separate from the
+  // `admin` Screen below, which stays as the in-app "Admin Operations
+  // Console" entry point reachable from Profile on the client target.
+  // "Exit Console" has nothing to return to here, so it's inert rather than
+  // wired to a client screen.
+  if (target === 'admin') {
+    return <AdminDashboard navigate={navigate} onBack={() => {}} />;
+  }
 
   const screenMap: Record<Screen, ReactElement> = {
     home: <Home navigate={navigate} />,
