@@ -494,6 +494,7 @@ export type Database = {
           address_notes: string | null
           address_text: string | null
           area: string
+          cancellation_reason: string | null
           category_id: string
           client_id: string
           completed_at: string | null
@@ -524,7 +525,6 @@ export type Database = {
           symptoms: string[]
           technician_id: string | null
           technician_location_at_dispatch: unknown
-          cancellation_reason?: string | null
           updated_at: string
           user_id: string | null
         }
@@ -534,6 +534,7 @@ export type Database = {
           address_notes?: string | null
           address_text?: string | null
           area: string
+          cancellation_reason?: string | null
           category_id: string
           client_id: string
           completed_at?: string | null
@@ -564,7 +565,6 @@ export type Database = {
           symptoms?: string[]
           technician_id?: string | null
           technician_location_at_dispatch?: unknown
-          cancellation_reason?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -574,6 +574,7 @@ export type Database = {
           address_notes?: string | null
           address_text?: string | null
           area?: string
+          cancellation_reason?: string | null
           category_id?: string
           client_id?: string
           completed_at?: string | null
@@ -604,7 +605,6 @@ export type Database = {
           symptoms?: string[]
           technician_id?: string | null
           technician_location_at_dispatch?: unknown
-          cancellation_reason?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -1088,7 +1088,7 @@ export type Database = {
           email: string | null
           id: string
           name: string
-          phone: string
+          phone: string | null
           preferred_language: string | null
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
@@ -1101,7 +1101,7 @@ export type Database = {
           email?: string | null
           id: string
           name: string
-          phone: string
+          phone?: string | null
           preferred_language?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
@@ -1114,7 +1114,7 @@ export type Database = {
           email?: string | null
           id?: string
           name?: string
-          phone?: string
+          phone?: string | null
           preferred_language?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
@@ -1134,6 +1134,7 @@ export type Database = {
           address_notes: string | null
           address_text: string | null
           area: string
+          cancellation_reason: string | null
           category_id: string
           client_id: string
           completed_at: string | null
@@ -1185,6 +1186,7 @@ export type Database = {
           address_notes: string | null
           address_text: string | null
           area: string
+          cancellation_reason: string | null
           category_id: string
           client_id: string
           completed_at: string | null
@@ -1225,34 +1227,56 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      approve_cost_addition: {
-        Args: {
-          p_addition_id: string;
-        };
-        Returns: Json;
-      };
-      decline_cost_addition: {
-        Args: {
-          p_addition_id: string;
-        };
-        Returns: Json;
-      };
-      create_cost_addition: {
-        Args: {
-          p_request_id: string;
-          p_reason: string;
-          p_amount: number;
-          p_tags?: string[];
-        };
-        Returns: Json;
-      };
+      approve_cost_addition: { Args: { p_addition_id: string }; Returns: Json }
       cancel_request: {
-        Args: {
-          p_request_id: string;
-          p_reason?: string | null;
-        };
-        Returns: Database["public"]["Tables"]["requests"]["Row"];
-      };
+        Args: { p_reason?: string; p_request_id: string }
+        Returns: {
+          accepted_at: string | null
+          address_line: string
+          address_notes: string | null
+          address_text: string | null
+          area: string
+          cancellation_reason: string | null
+          category_id: string
+          client_id: string
+          completed_at: string | null
+          contact_name: string
+          contact_phone: string
+          created_at: string
+          description: string | null
+          estimated_duration_minutes: number | null
+          estimated_total: number
+          execution_window: unknown
+          family_member_id: string | null
+          final_price: number | null
+          id: string
+          offering_id: string | null
+          price_adjustment_notes: string | null
+          price_adjustment_reason:
+            | Database["public"]["Enums"]["price_adjustment_reason"]
+            | null
+          priority: Database["public"]["Enums"]["request_priority"] | null
+          radius_expanded_at: string | null
+          saved_address_id: string | null
+          scheduled_at: string | null
+          search_radius_km: number
+          service_location: unknown
+          status: Database["public"]["Enums"]["request_status"]
+          superseded_from_request_id: string | null
+          surge_multiplier_applied: number
+          symptoms: string[]
+          technician_id: string | null
+          technician_location_at_dispatch: unknown
+          updated_at: string
+          user_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "requests"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       complete_profile: {
         Args: { p_name: string; p_phone: string }
         Returns: {
@@ -1263,7 +1287,7 @@ export type Database = {
           email: string | null
           id: string
           name: string
-          phone: string
+          phone: string | null
           preferred_language: string | null
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
@@ -1275,6 +1299,16 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_cost_addition: {
+        Args: {
+          p_amount: number
+          p_reason: string
+          p_request_id: string
+          p_tags?: string[]
+        }
+        Returns: Json
+      }
+      decline_cost_addition: { Args: { p_addition_id: string }; Returns: Json }
       dismiss_request: { Args: { p_request_id: string }; Returns: undefined }
       get_nearby_matching_technicians: {
         Args: { p_radius_meters: number; p_request_id: string }
