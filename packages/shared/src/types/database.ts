@@ -418,6 +418,7 @@ export type Database = {
           actor_id: string | null
           actor_role: Database["public"]["Enums"]["actor_role"]
           id: string
+          notes: string | null
           occurred_at: string
           reason: Database["public"]["Enums"]["status_event_reason"] | null
           request_id: string
@@ -427,6 +428,7 @@ export type Database = {
           actor_id?: string | null
           actor_role: Database["public"]["Enums"]["actor_role"]
           id?: string
+          notes?: string | null
           occurred_at?: string
           reason?: Database["public"]["Enums"]["status_event_reason"] | null
           request_id: string
@@ -436,6 +438,7 @@ export type Database = {
           actor_id?: string | null
           actor_role?: Database["public"]["Enums"]["actor_role"]
           id?: string
+          notes?: string | null
           occurred_at?: string
           reason?: Database["public"]["Enums"]["status_event_reason"] | null
           request_id?: string
@@ -521,6 +524,7 @@ export type Database = {
           symptoms: string[]
           technician_id: string | null
           technician_location_at_dispatch: unknown
+          cancellation_reason?: string | null
           updated_at: string
           user_id: string | null
         }
@@ -560,6 +564,7 @@ export type Database = {
           symptoms?: string[]
           technician_id?: string | null
           technician_location_at_dispatch?: unknown
+          cancellation_reason?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -599,6 +604,7 @@ export type Database = {
           symptoms?: string[]
           technician_id?: string | null
           technician_location_at_dispatch?: unknown
+          cancellation_reason?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -1219,6 +1225,34 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      approve_cost_addition: {
+        Args: {
+          p_addition_id: string;
+        };
+        Returns: Json;
+      };
+      decline_cost_addition: {
+        Args: {
+          p_addition_id: string;
+        };
+        Returns: Json;
+      };
+      create_cost_addition: {
+        Args: {
+          p_request_id: string;
+          p_reason: string;
+          p_amount: number;
+          p_tags?: string[];
+        };
+        Returns: Json;
+      };
+      cancel_request: {
+        Args: {
+          p_request_id: string;
+          p_reason?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["requests"]["Row"];
+      };
       complete_profile: {
         Args: { p_name: string; p_phone: string }
         Returns: {

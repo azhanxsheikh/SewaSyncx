@@ -11,7 +11,7 @@ interface Props {
 export default function FindingTechnician({ navigate }: Props) {
   const { job, setStatus, updateJob } = useDispatch()
   const activeRequest = job
-  const [radius, setRadius] = useState(() => job?.searchRadiusKm || 10)
+  const [radius, setRadius] = useState(() => job?.searchRadiusKm || 20)
   const [countdown, setCountdown] = useState(30)
   const [elapsed, setElapsed] = useState(0)
   const [techProgress, setTechProgress] = useState(0)
@@ -128,9 +128,10 @@ export default function FindingTechnician({ navigate }: Props) {
                 <h2 className="font-display font-800 text-xl text-gray-900">
                   {job?.status === "unfulfilled"
                     ? "Please try again later"
-                    : job?.requesterName && job.requesterName !== job.customerName
-                    ? `Finding a technician near ${job.customerName}'s location`
-                    : "Finding your technician"}
+                    : job?.requesterName &&
+                        job.requesterName !== job.customerName
+                      ? `Finding a technician near ${job.customerName}'s location`
+                      : "Finding your technician"}
                   {job?.status === "unfulfilled" ? "" : ".".repeat(dots + 1)}
                 </h2>
                 <p className="text-gray-500 text-sm mt-1">
