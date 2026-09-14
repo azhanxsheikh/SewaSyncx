@@ -515,7 +515,7 @@ export default function TechnicianProfilePage() {
                 ))}
               </datalist>
               <p className="text-[11px] text-slate-500 mt-1">
-                Emergency dispatch radar searches within a 10 km radius of this zone
+                Emergency dispatch radar searches within a 20 km radius of this zone
               </p>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../../../../packages/shared/src/lib/supabase';
 import { useAuth } from '../../../../packages/shared/src/auth';
 import { useAdminRealtime } from '../hooks/useAdminRealtime';
@@ -12,8 +12,10 @@ export interface AdminDisputeItem {
   priority: DisputePriority;
   reasonCategory: string;
   status: string;
+  clientId: string;
   clientName: string;
   clientPhone: string;
+  technicianId: string;
   technicianName: string;
   technicianPhone: string;
   serviceCategory: string;
@@ -22,6 +24,7 @@ export interface AdminDisputeItem {
   estimatedPrice: number;
   description: string;
   createdAt: string;
+  rawCreatedAt: string;
   prePhotoUrl?: string;
   postPhotoUrl?: string;
 }
@@ -47,6 +50,14 @@ export default function DisputeMediationPanel() {
   const [loading, setLoading] = useState(true);
   const [timelineEvents, setTimelineEvents] = useState<TimelineEventItem[]>([]);
 
+  // Pagination state (10 items per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  // Track image load errors to prevent broken image icons
+  const [preImageError, setPreImageError] = useState(false);
+  const [postImageError, setPostImageError] = useState(false);
+
   const derivePriority = (reason: string): DisputePriority => {
     if (reason === 'safety_concern' || reason === 'harassment') return 'critical';
     if (reason === 'price_dispute' || reason === 'property_damage') return 'high';
@@ -56,6 +67,7 @@ export default function DisputeMediationPanel() {
 
   const loadDisputes = useCallback(async () => {
     try {
+      // Fetch disputes sorted by created_at DESC (newest first)
       const { data: dispRows, error: dispErr } = await supabase
         .from('disputes')
         .select('*')
@@ -93,12 +105,23 @@ export default function DisputeMediationPanel() {
 
       const items: AdminDisputeItem[] = dispRows.map((d) => {
         const req = reqMap.get(d.request_id);
-        const clientUser = req?.client_id ? userMap.get(req.client_id) : userMap.get(d.initiator_id);
-        const techUser = req?.technician_id ? userMap.get(req.technician_id) : null;
+        const clientId = req?.client_id || d.initiator_id;
+        const techId = req?.technician_id || '';
+        const clientUser = userMap.get(clientId);
+        const techUser = techId ? userMap.get(techId) : null;
         const categoryName = req?.category_id ? catMap.get(req.category_id) || 'General Service' : 'Home Service';
 
         const rawDate = new Date(d.created_at);
-        const timeFormatted = rawDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const dateStr = rawDate.toLocaleDateString('en-IN', {
+          day: 'numeric',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+
+        const est = Number(req?.estimated_total || 0);
+        const fin = Number(req?.final_price || est);
+        const escrow = Number(d.liability_amount || fin || est || 500);
 
         return {
           id: d.id,
@@ -106,16 +129,19 @@ export default function DisputeMediationPanel() {
           priority: derivePriority(d.reason_category),
           reasonCategory: d.reason_category,
           status: d.status,
-          clientName: clientUser?.name || 'Customer',
-          clientPhone: clientUser?.phone || '+91 98765 00000',
+          clientId,
+          clientName: clientUser?.name || 'Verified Client',
+          clientPhone: clientUser?.phone || '+91-XXXXXXXXXX',
+          technicianId: techId,
           technicianName: techUser?.name || 'Assigned Technician',
-          technicianPhone: techUser?.phone || '+91 98112 00000',
+          technicianPhone: techUser?.phone || '+91-XXXXXXXXXX',
           serviceCategory: categoryName,
-          escrowAmount: Number(d.liability_amount || req?.final_price || req?.estimated_total || 500),
-          finalPrice: Number(req?.final_price || req?.estimated_total || 0),
-          estimatedPrice: Number(req?.estimated_total || 0),
+          escrowAmount: escrow,
+          finalPrice: fin,
+          estimatedPrice: est,
           description: d.description,
-          createdAt: timeFormatted,
+          createdAt: dateStr,
+          rawCreatedAt: d.created_at,
         };
       });
 
@@ -124,26 +150,33 @@ export default function DisputeMediationPanel() {
         setSelectedId(items[0].id);
       }
     } catch (err) {
-      console.error('[admin] error loading disputes:', err);
+      console.error('[admin] failed to fetch live disputes:', err);
     } finally {
       setLoading(false);
     }
   }, [selectedId]);
 
   useEffect(() => {
-    void loadDisputes();
+    loadDisputes();
   }, [loadDisputes]);
 
+  // Realtime updates
   useAdminRealtime({
     tables: ['disputes', 'request_status_events'],
     onChange: () => {
-      void loadDisputes();
+      loadDisputes();
     },
   });
 
   const selectedDispute = disputes.find((d) => d.id === selectedId) || disputes[0];
 
-  // Load timeline events and photos for the active dispute
+  // Reset image errors when selected dispute changes
+  useEffect(() => {
+    setPreImageError(false);
+    setPostImageError(false);
+  }, [selectedId]);
+
+  // Fetch timeline events and attachments when selectedDispute changes
   useEffect(() => {
     if (!selectedDispute) return;
     let cancelled = false;
@@ -228,11 +261,11 @@ export default function DisputeMediationPanel() {
           const post = attachments.find((a) => a.phase === 'post_work');
 
           if (pre) {
-            const { data } = supabase.storage.from('sos-media').getPublicUrl(pre.storage_path);
+            const { data } = supabase.storage.from('request_attachments').getPublicUrl(pre.storage_path);
             selectedDispute.prePhotoUrl = data?.publicUrl;
           }
           if (post) {
-            const { data } = supabase.storage.from('sos-media').getPublicUrl(post.storage_path);
+            const { data } = supabase.storage.from('request_attachments').getPublicUrl(post.storage_path);
             selectedDispute.postPhotoUrl = data?.publicUrl;
           }
         }
@@ -248,9 +281,21 @@ export default function DisputeMediationPanel() {
     };
   }, [selectedDispute]);
 
-  const filteredDisputes = disputes.filter(
-    (d) => filterPriority === 'all' || d.priority === filterPriority,
-  );
+  const filteredDisputes = useMemo(() => {
+    return disputes.filter((d) => filterPriority === 'all' || d.priority === filterPriority);
+  }, [disputes, filterPriority]);
+
+  // Reset to page 1 on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterPriority]);
+
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(filteredDisputes.length / ITEMS_PER_PAGE));
+  const paginatedDisputes = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredDisputes.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredDisputes, currentPage]);
 
   const handleOpenAction = (action: ArbitrationAction) => {
     setActiveModalAction(action);
@@ -260,38 +305,64 @@ export default function DisputeMediationPanel() {
     }
   };
 
+  // Dynamic split calculation: tech_amount = escrow_balance - client_amount
+  const clientSplitCalculated = useMemo(() => {
+    if (!selectedDispute) return 0;
+    const val = Number(splitAmount);
+    if (isNaN(val) || val < 0) return 0;
+    return Math.min(val, selectedDispute.escrowAmount);
+  }, [splitAmount, selectedDispute]);
+
+  const techSplitCalculated = useMemo(() => {
+    if (!selectedDispute) return 0;
+    return Math.max(0, selectedDispute.escrowAmount - clientSplitCalculated);
+  }, [selectedDispute, clientSplitCalculated]);
+
   const handleExecuteAction = async () => {
     if (!justification.trim() || !selectedDispute) return;
 
-    let updatedStatus = selectedDispute.status;
     let liabilityParty: 'client' | 'technician' | 'platform' | 'split' = 'platform';
     let liabilityAmount = selectedDispute.escrowAmount;
     let actionLabel = '';
+    let clientRefundAmount = 0;
+    let techPayoutAmount = 0;
+
+    let resolvedStatus: 'resolved_split' | 'resolved_client_favor' | 'resolved_technician_favor' | 'dismissed' = 'resolved_split';
 
     if (activeModalAction === 'release_escrow') {
-      updatedStatus = 'resolved_technician_favor';
       liabilityParty = 'platform';
-      actionLabel = `Escrow ₹${selectedDispute.escrowAmount} released to technician ${selectedDispute.technicianName}.`;
+      liabilityAmount = selectedDispute.escrowAmount;
+      clientRefundAmount = 0;
+      techPayoutAmount = selectedDispute.escrowAmount;
+      resolvedStatus = 'resolved_technician_favor';
+      actionLabel = `Escrow ₹${selectedDispute.escrowAmount} released in full to technician ${selectedDispute.technicianName}.`;
     } else if (activeModalAction === 'force_refund') {
-      updatedStatus = 'resolved_client_favor';
       liabilityParty = 'technician';
+      liabilityAmount = selectedDispute.escrowAmount;
+      clientRefundAmount = selectedDispute.escrowAmount;
+      techPayoutAmount = 0;
+      resolvedStatus = 'resolved_client_favor';
       actionLabel = `Full refund of ₹${selectedDispute.escrowAmount} credited to ${selectedDispute.clientName}.`;
     } else if (activeModalAction === 'split_payment') {
-      updatedStatus = 'resolved_split';
       liabilityParty = 'split';
-      liabilityAmount = Number(splitAmount);
-      actionLabel = `Split settlement applied: ₹${splitAmount} to client, ₹${selectedDispute.escrowAmount - Number(splitAmount)} to technician.`;
+      liabilityAmount = clientSplitCalculated;
+      clientRefundAmount = clientSplitCalculated;
+      techPayoutAmount = techSplitCalculated;
+      resolvedStatus = 'resolved_split';
+      actionLabel = `Split settlement applied: ₹${clientSplitCalculated} to client, ₹${techSplitCalculated} to technician.`;
     } else if (activeModalAction === 'reassign_worker') {
-      updatedStatus = 'dismissed';
       liabilityParty = 'platform';
-      actionLabel = `Dispute marked dismissed. Worker reassign noted for request ${selectedDispute.requestId}.`;
+      liabilityAmount = 0;
+      resolvedStatus = 'dismissed';
+      actionLabel = `Dispute resolved. Worker reassignment noted for request ${selectedDispute.requestId}.`;
     }
 
     try {
+      // 1. Update public.disputes
       const { error: updErr } = await supabase
         .from('disputes')
         .update({
-          status: updatedStatus as any,
+          status: resolvedStatus,
           liability_party: liabilityParty,
           liability_amount: liabilityAmount,
           resolved_at: new Date().toISOString(),
@@ -301,14 +372,54 @@ export default function DisputeMediationPanel() {
 
       if (updErr) {
         console.error('[admin] failed to resolve dispute in database:', updErr);
+        throw updErr;
       }
 
+      // 2. Insert notifications into public.notifications for both client and technician
+      const notificationsToInsert: {
+        user_id: string;
+        request_id: string;
+        type: 'status_update';
+        title: string;
+        icon: string;
+      }[] = [];
+
+      if (selectedDispute.clientId) {
+        notificationsToInsert.push({
+          user_id: selectedDispute.clientId,
+          request_id: selectedDispute.requestId,
+          type: 'status_update',
+          title: `Dispute Resolved: Refund of ₹${clientRefundAmount} allocated to your account.`,
+          icon: 'shield-check',
+        });
+      }
+
+      if (selectedDispute.technicianId) {
+        notificationsToInsert.push({
+          user_id: selectedDispute.technicianId,
+          request_id: selectedDispute.requestId,
+          type: 'status_update',
+          title: `Dispute Resolved: Payout of ₹${techPayoutAmount} approved for release.`,
+          icon: 'wallet',
+        });
+      }
+
+      if (notificationsToInsert.length > 0) {
+        const { error: notifErr } = await supabase
+          .from('notifications')
+          .insert(notificationsToInsert);
+        if (notifErr) {
+          console.warn('[admin] notifications insert warning:', notifErr);
+        }
+      }
+
+      // Update local state
       setDisputes((prev) =>
         prev.map((item) =>
           item.id === selectedDispute.id
             ? {
                 ...item,
-                status: updatedStatus,
+                status: 'resolved',
               }
             : item,
         ),
@@ -319,6 +430,7 @@ export default function DisputeMediationPanel() {
       setJustification('');
     } catch (err) {
       console.error('[admin] execution error:', err);
+      setActionSuccessMsg('Failed to commit determination. Check database permissions.');
     }
   };
 
@@ -333,7 +445,7 @@ export default function DisputeMediationPanel() {
     <div className="space-y-6">
       {/* Overview header */}
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="font-display text-2xl font-800 text-[#0B132B]">The Mediator — Dispute Arbitration</h2>
             <p className="text-sm text-slate-500">
@@ -348,7 +460,7 @@ export default function DisputeMediationPanel() {
                 onClick={() => setFilterPriority(p)}
                 className={`rounded-xl px-3.5 py-1.5 text-xs font-bold uppercase transition-all shadow-xs ${
                   filterPriority === p
-                    ? 'bg-sky-600 text-white shadow-sm ring-2 ring-sky-400/20'
+                    ? 'bg-[#0B132B] text-white shadow-sm ring-2 ring-sky-400/20'
                     : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200'
                 }`}
               >
@@ -362,71 +474,123 @@ export default function DisputeMediationPanel() {
       {actionSuccessMsg && (
         <div className="rounded-2xl border border-emerald-300 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800 flex items-center justify-between shadow-xs">
           <span>✓ {actionSuccessMsg}</span>
-          <button type="button" onClick={() => setActionSuccessMsg(null)} className="text-emerald-600 hover:text-emerald-900 text-xs font-bold">
+          <button
+            type="button"
+            onClick={() => setActionSuccessMsg(null)}
+            className="text-emerald-600 hover:text-emerald-900 text-xs font-bold"
+          >
             Dismiss
           </button>
         </div>
       )}
 
-      {/* Main layout: Queue vs Detailed Workbench */}
+      {/* Main layout: Paginated Queue vs Detailed Workbench */}
       <div className="flex flex-col gap-6 lg:flex-row">
-        {/* Left: Active Disputes Queue */}
-        <div className="space-y-3 lg:w-72 shrink-0">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            Active Queue ({filteredDisputes.length})
-          </p>
+        {/* Left: Active Disputes Paginated Queue */}
+        <div className="space-y-3 lg:w-96 shrink-0">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Disputes Queue ({filteredDisputes.length})
+            </p>
+            <span className="text-xs text-slate-400 font-semibold">
+              Page {currentPage} of {totalPages}
+            </span>
+          </div>
+
           <div className="space-y-2.5">
             {loading ? (
-              <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-xs text-slate-500 shadow-xs">
+              <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-xs text-slate-500 shadow-xs">
                 Loading dispute queue...
               </div>
-            ) : filteredDisputes.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-xs text-slate-500 shadow-xs">
-                No active disputes in queue.
+            ) : paginatedDisputes.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-xs text-slate-500 shadow-xs">
+                No active disputes matching filter.
               </div>
             ) : (
-              filteredDisputes.map((dispute) => (
-                <div
-                  key={dispute.id}
-                  onClick={() => setSelectedId(dispute.id)}
-                  className={`cursor-pointer rounded-2xl border p-4 transition-all shadow-xs ${
-                    dispute.id === selectedDispute?.id
-                      ? 'border-sky-500 bg-sky-50/50 shadow-sm ring-2 ring-sky-400/20'
-                      : 'border-slate-200 bg-white hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span
-                      className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase ${getPriorityBadgeClass(
-                        dispute.priority,
-                      )}`}
-                    >
-                      {dispute.priority}
-                    </span>
-                    <span className="text-xs text-slate-500">{dispute.createdAt}</span>
+              paginatedDisputes.map((dispute) => {
+                const isSelected = dispute.id === selectedDispute?.id;
+                return (
+                  <div
+                    key={dispute.id}
+                    className={`rounded-2xl border p-4 transition-all shadow-xs ${
+                      isSelected
+                        ? 'border-sky-500 bg-sky-50/60 shadow-sm ring-2 ring-sky-400/20'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span
+                        className={`rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase ${getPriorityBadgeClass(
+                          dispute.priority,
+                        )}`}
+                      >
+                        {dispute.priority}
+                      </span>
+                      <span className="text-[11px] font-medium text-slate-400">{dispute.createdAt}</span>
+                    </div>
+
+                    <p className="font-display font-bold text-slate-900 text-sm capitalize">
+                      {dispute.reasonCategory.replace(/_/g, ' ')} · {dispute.serviceCategory}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500 line-clamp-2">{dispute.description}</p>
+
+                    <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5 text-xs">
+                      <div>
+                        <span className="font-medium text-slate-700 block">{dispute.clientName}</span>
+                        <span className="font-bold text-slate-900">Escrow: ₹{dispute.escrowAmount}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedId(dispute.id)}
+                        className={`rounded-xl px-3 py-1.5 text-xs font-bold transition-all shadow-xs ${
+                          isSelected
+                            ? 'bg-sky-600 text-white shadow-sm'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                        }`}
+                      >
+                        {isSelected ? 'Viewing Details' : 'View Details'}
+                      </button>
+                    </div>
                   </div>
-                  <p className="font-display font-bold text-slate-900 text-sm capitalize">
-                    {dispute.reasonCategory.replace(/_/g, ' ')}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500 line-clamp-2">{dispute.description}</p>
-                  <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-xs text-slate-500">
-                    <span className="font-medium text-slate-700">{dispute.clientName}</span>
-                    <span className="font-bold text-slate-900">₹{dispute.escrowAmount}</span>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-2.5 shadow-xs">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="rounded-lg px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                ← Prev
+              </button>
+              <span className="text-xs font-semibold text-slate-600">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="rounded-lg px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Right: Comparative Chronological View & Arbitration Workbench */}
         {selectedDispute ? (
           <div className="flex-1 min-w-0 space-y-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
             {/* Header info */}
-            <div className="flex items-center justify-between border-b border-slate-100 pb-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-5">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-sky-600 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md uppercase">
+                  <span className="text-xs font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-md uppercase">
                     Case #{selectedDispute.id.slice(0, 8)}
                   </span>
                   <span className="text-slate-400">·</span>
@@ -436,7 +600,7 @@ export default function DisputeMediationPanel() {
                   {selectedDispute.reasonCategory.replace(/_/g, ' ')} · {selectedDispute.serviceCategory}
                 </h3>
               </div>
-              <div className="text-right">
+              <div className="text-left sm:text-right">
                 <p className="text-xs text-slate-500 font-semibold">Escrow Balance</p>
                 <p className="font-display text-2xl font-900 text-amber-600">₹{selectedDispute.escrowAmount}</p>
               </div>
@@ -496,36 +660,51 @@ export default function DisputeMediationPanel() {
               </div>
             </div>
 
-            {/* Pre & Post Work Evidence Photos */}
-            {(selectedDispute.prePhotoUrl || selectedDispute.postPhotoUrl) && (
-              <div>
-                <p className="mb-2 font-display text-sm font-bold text-slate-900">On-Site Media Evidence</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {selectedDispute.prePhotoUrl && (
-                    <div className="rounded-xl border border-slate-200 bg-[#F4F7FB] p-3 shadow-xs">
-                      <p className="text-xs font-semibold text-slate-700 mb-2">Pre-Work Site Inspection</p>
+            {/* On-Site Media Evidence with Clean Safe Placeholders */}
+            <div>
+              <p className="mb-2 font-display text-sm font-bold text-slate-900">On-Site Media Evidence</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Pre-work Photo */}
+                <div className="rounded-xl border border-slate-200 bg-[#F4F7FB] p-3 shadow-xs space-y-2">
+                  <p className="text-xs font-semibold text-slate-700">Pre-Work Site Inspection</p>
+                  {selectedDispute.prePhotoUrl && !preImageError ? (
+                    <div>
                       <img
                         src={selectedDispute.prePhotoUrl}
                         alt="Pre-work"
-                        className="h-28 w-full rounded-lg object-cover border border-slate-200"
+                        onError={() => setPreImageError(true)}
+                        className="h-40 w-full rounded-lg object-cover border border-slate-200"
                       />
                       <p className="mt-2 text-[11px] font-semibold text-emerald-700">✓ EXIF Verified on premises</p>
                     </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-40 bg-slate-100 rounded-xl border border-dashed border-slate-300 text-slate-400">
+                      <span className="text-xs font-medium">No on-site photo uploaded</span>
+                    </div>
                   )}
-                  {selectedDispute.postPhotoUrl && (
-                    <div className="rounded-xl border border-slate-200 bg-[#F4F7FB] p-3 shadow-xs">
-                      <p className="text-xs font-semibold text-slate-700 mb-2">Post-Work Completion Photo</p>
+                </div>
+
+                {/* Post-work Photo */}
+                <div className="rounded-xl border border-slate-200 bg-[#F4F7FB] p-3 shadow-xs space-y-2">
+                  <p className="text-xs font-semibold text-slate-700">Post-Work Completion Photo</p>
+                  {selectedDispute.postPhotoUrl && !postImageError ? (
+                    <div>
                       <img
                         src={selectedDispute.postPhotoUrl}
                         alt="Post-work"
-                        className="h-28 w-full rounded-lg object-cover border border-slate-200"
+                        onError={() => setPostImageError(true)}
+                        className="h-40 w-full rounded-lg object-cover border border-slate-200"
                       />
                       <p className="mt-2 text-[11px] font-semibold text-sky-700">Post-service visual evidence</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-40 bg-slate-100 rounded-xl border border-dashed border-slate-300 text-slate-400">
+                      <span className="text-xs font-medium">No on-site photo uploaded</span>
                     </div>
                   )}
                 </div>
               </div>
-            )}
+            </div>
 
             {/* Arbitration Decisions Controls */}
             <div className="border-t border-slate-100 pt-5 space-y-4">
@@ -581,18 +760,28 @@ export default function DisputeMediationPanel() {
                   </div>
 
                   {activeModalAction === 'split_payment' && (
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Amount allocated to client (₹):
-                      </label>
-                      <input
-                        type="number"
-                        value={splitAmount}
-                        onChange={(e) => setSplitAmount(e.target.value)}
-                        max={selectedDispute.escrowAmount}
-                        min="0"
-                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
-                      />
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                          Amount allocated to client (₹):
+                        </label>
+                        <input
+                          type="number"
+                          value={splitAmount}
+                          onChange={(e) => setSplitAmount(e.target.value)}
+                          max={selectedDispute.escrowAmount}
+                          min="0"
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500"
+                        />
+                      </div>
+
+                      {/* Live calculation confirmation */}
+                      <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900 font-medium">
+                        <span>Client will receive: </span>
+                        <span className="font-bold text-sky-950">₹{clientSplitCalculated}</span>
+                        <span> | Technician will receive: </span>
+                        <span className="font-bold text-sky-950">₹{techSplitCalculated}</span>
+                      </div>
                     </div>
                   )}
 

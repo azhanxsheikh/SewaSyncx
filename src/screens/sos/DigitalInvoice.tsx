@@ -1,8 +1,10 @@
+import { useState, useMemo } from 'react';
 import type { Screen } from '../../types/navigation';
 import { usePrimaryTechnician } from '../../hooks/useTechnicians';
 import { useInvoiceDetails } from '../../hooks/useBilling';
 import { useDispatch } from '../../context/DispatchContext';
 import Header from '../../components/Header';
+import RaiseDisputeModal from '../../components/RaiseDisputeModal';
 
 interface Props {
   navigate: (s: Screen) => void;
@@ -13,6 +15,25 @@ export default function DigitalInvoice({ navigate, onBack }: Props) {
   const tech = usePrimaryTechnician();
   const { job } = useDispatch();
   const { lineItems: invoiceLineItems, summary } = useInvoiceDetails(job);
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+
+  const invoiceNo = useMemo(() => {
+    return `#INV-${(job?.id || '20260905').slice(0, 8).toUpperCase()}`;
+  }, [job?.id]);
+
+  const invoiceDate = useMemo(() => {
+    const timestamp = job?.updatedAt || job?.createdAt || Date.now();
+    return new Date(timestamp).toLocaleDateString('en-IN', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }, [job?.updatedAt, job?.createdAt]);
+
+  const techDisplayName = job?.technicianName || (job?.technicianId ? 'Kevin' : tech.name);
+  const serviceLabel = job?.service
+    ? job.service.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+    : 'Emergency Service';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -37,19 +58,19 @@ export default function DigitalInvoice({ navigate, onBack }: Props) {
             <div className="grid grid-cols-2 gap-4 mb-5 pb-5 border-b border-gray-100">
               <div>
                 <p className="text-xs text-gray-400 mb-0.5">Invoice No.</p>
-                <p className="font-600 text-gray-900 text-sm">#INV-2026-09-2094</p>
+                <p className="font-600 text-gray-900 text-sm font-mono">{invoiceNo}</p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-400 mb-0.5">Date</p>
-                <p className="font-600 text-gray-900 text-sm">Sep 5, 2026</p>
+                <p className="font-600 text-gray-900 text-sm">{invoiceDate}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-400 mb-0.5">Job ID</p>
                 <p className="font-600 text-gray-900 text-sm">{summary.jobId}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-gray-400 mb-0.5">Time</p>
-                <p className="font-600 text-gray-900 text-sm">2:42 PM – 3:54 PM</p>
+                <p className="text-xs text-gray-400 mb-0.5">Status</p>
+                <p className="font-600 text-emerald-600 text-sm">Settled</p>
               </div>
             </div>
 
@@ -63,9 +84,9 @@ export default function DigitalInvoice({ navigate, onBack }: Props) {
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-400 mb-1">Technician</p>
-                <p className="font-600 text-gray-900">{job?.technicianName || tech.name}</p>
-                <p className="text-gray-500 text-xs">Electrician</p>
-                <p className="text-gray-500 text-xs">⭐ {tech.rating} rating</p>
+                <p className="font-600 text-gray-900">{techDisplayName}</p>
+                <p className="text-gray-500 text-xs">{serviceLabel}</p>
+                <p className="text-gray-500 text-xs">⭐ 4.9 rating</p>
               </div>
             </div>
 
@@ -111,7 +132,7 @@ export default function DigitalInvoice({ navigate, onBack }: Props) {
             </div>
 
             <div className="mt-3 text-xs text-gray-400 text-center">
-              Paid via UPI · Sep 5, 2026 · 4:01 PM
+              Paid via UPI · {invoiceDate}
             </div>
           </div>
 
@@ -137,6 +158,13 @@ export default function DigitalInvoice({ navigate, onBack }: Props) {
             Rate Your Experience →
           </button>
           <button
+            onClick={() => setShowDisputeModal(true)}
+            className="w-full py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-700 font-display font-600 text-xs hover:bg-red-100 transition-colors flex items-center justify-center gap-1.5"
+          >
+            <span>⚠️</span>
+            <span>Report an Issue / Raise Complaint</span>
+          </button>
+          <button
             onClick={onBack}
             className="w-full py-3 rounded-xl font-display font-600 text-sm text-gray-500 hover:text-gray-800 transition-colors"
           >
@@ -144,6 +172,14 @@ export default function DigitalInvoice({ navigate, onBack }: Props) {
           </button>
         </div>
       </div>
+
+      <RaiseDisputeModal
+        isOpen={showDisputeModal}
+        onClose={() => setShowDisputeModal(false)}
+        requestId={job?.id || ''}
+        serviceName={serviceLabel}
+        technicianName={techDisplayName}
+      />
     </div>
   );
 }

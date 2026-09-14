@@ -27,40 +27,10 @@ export interface CollusionAnomalyRecord {
   flaggedDate: string;
 }
 
-export interface PhotoMismatchReviewItem {
-  id: string;
-  requestId: string;
-  technicianName: string;
-  clientName: string;
-  serviceCategory: string;
-  prePhotoUrl: string;
-  postPhotoUrl: string;
-  exifGpsDeltaMeters: number;
-  timestampAnomaly: boolean;
-  phashDistance: number;
-  status: 'pending_review' | 'approved' | 'dispute_opened';
-}
-
-function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371e3; // Earth radius in meters
-  const phi1 = (lat1 * Math.PI) / 180;
-  const phi2 = (lat2 * Math.PI) / 180;
-  const deltaPhi = ((lat2 - lat1) * Math.PI) / 180;
-  const deltaLambda = ((lon2 - lon1) * Math.PI) / 180;
-
-  const a =
-    Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
-    Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return Math.round(R * c);
-}
-
 export default function OperationsMetricsView() {
   const [varianceSummaries, setVarianceSummaries] = useState<FareVarianceCategorySummary[]>([]);
   const [platformMeanVariance, setPlatformMeanVariance] = useState<number>(0);
   const [collusionFlags, setCollusionFlags] = useState<CollusionAnomalyRecord[]>([]);
-  const [photoReviews, setPhotoReviews] = useState<PhotoMismatchReviewItem[]>([]);
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -70,7 +40,6 @@ export default function OperationsMetricsView() {
         { data: reqRows },
         { data: catRows },
         { data: userRows },
-        { data: attRows },
       ] = await Promise.all([
         supabase
           .from('requests')
@@ -78,27 +47,28 @@ export default function OperationsMetricsView() {
           .order('created_at', { ascending: false }),
         supabase.from('service_categories').select('id, name'),
         supabase.from('users').select('id, name, phone'),
-        supabase.from('request_attachments').select('*').order('created_at', { ascending: true }),
       ]);
 
       const requests = reqRows || [];
       const categories = catRows || [];
       const users = userRows || [];
-      const attachments = attRows || [];
 
       const userMap = new Map(users.map((u) => [u.id, u.name]));
-      const catMap = new Map(categories.map((c) => [c.id, c.name]));
 
       // -------------------------------------------------------------
-      // 1. FARE VARIANCE AGGREGATION
+      // 1. AUTHENTIC FARE VARIANCE AGGREGATION
+      // Only completed jobs where final_price IS NOT NULL
       // -------------------------------------------------------------
+      const completedWithPrice = requests.filter(
+        (r) => r.status === 'completed' && r.final_price !== null && r.final_price !== undefined,
+      );
+
       let totalPlatformEstimated = 0;
       let totalPlatformFinal = 0;
-      let platformJobsCount = 0;
 
       const summaries: FareVarianceCategorySummary[] = categories.map((cat) => {
-        const catReqs = requests.filter((r) => r.category_id === cat.id);
-        const jobCount = catReqs.length;
+        const catCompletedReqs = completedWithPrice.filter((r) => r.category_id === cat.id);
+        const jobCount = catCompletedReqs.length;
 
         if (jobCount === 0) {
           return {
@@ -115,9 +85,9 @@ export default function OperationsMetricsView() {
         let catFinalSum = 0;
         let highVarianceCount = 0;
 
-        for (const req of catReqs) {
+        for (const req of catCompletedReqs) {
           const estimated = Number(req.estimated_total || 0);
-          const finalPrice = Number(req.final_price || req.estimated_total || 0);
+          const finalPrice = Number(req.final_price || 0);
 
           catEstimatedSum += estimated;
           catFinalSum += finalPrice;
@@ -132,7 +102,6 @@ export default function OperationsMetricsView() {
 
         totalPlatformEstimated += catEstimatedSum;
         totalPlatformFinal += catFinalSum;
-        platformJobsCount += jobCount;
 
         const avgEstimated = Math.round(catEstimatedSum / jobCount);
         const avgFinal = Math.round(catFinalSum / jobCount);
@@ -237,71 +206,6 @@ export default function OperationsMetricsView() {
       }
 
       setCollusionFlags(detectedAnomalies);
-
-      // -------------------------------------------------------------
-      // 3. PHOTO MISMATCH & INTEGRITY COMPARATOR
-      // -------------------------------------------------------------
-      const reqToAttachments = new Map<string, typeof attachments>();
-      for (const att of attachments) {
-        const existing = reqToAttachments.get(att.request_id) || [];
-        existing.push(att);
-        reqToAttachments.set(att.request_id, existing);
-      }
-
-      const reviews: PhotoMismatchReviewItem[] = [];
-      let reviewIdx = 1;
-
-      for (const [rId, atts] of reqToAttachments.entries()) {
-        const preAtt = atts.find((a) => a.phase === 'pre_work');
-        const postAtt = atts.find((a) => a.phase === 'post_work');
-
-        if (preAtt && postAtt) {
-          const req = requests.find((r) => r.id === rId);
-          const techName = req?.technician_id ? userMap.get(req.technician_id) || 'Assigned Tech' : 'Assigned Tech';
-          const clientName = req?.client_id ? userMap.get(req.client_id) || 'Client' : 'Client';
-          const catName = req?.category_id ? catMap.get(req.category_id) || 'Home Service' : 'Home Service';
-
-          // Get public URLs from Supabase storage
-          const preUrl = supabase.storage
-            .from('request_attachments')
-            .getPublicUrl(preAtt.storage_path).data.publicUrl;
-          const postUrl = supabase.storage
-            .from('request_attachments')
-            .getPublicUrl(postAtt.storage_path).data.publicUrl;
-
-          // GPS Delta
-          let deltaMeters = 12;
-          if (
-            preAtt.exif_lat != null &&
-            preAtt.exif_lng != null &&
-            postAtt.exif_lat != null &&
-            postAtt.exif_lng != null
-          ) {
-            deltaMeters = calculateDistanceMeters(
-              Number(preAtt.exif_lat),
-              Number(preAtt.exif_lng),
-              Number(postAtt.exif_lat),
-              Number(postAtt.exif_lng),
-            );
-          }
-
-          reviews.push({
-            id: `REV-${String(reviewIdx++).padStart(3, '0')}`,
-            requestId: rId.slice(0, 8),
-            technicianName: techName,
-            clientName: clientName,
-            serviceCategory: catName,
-            prePhotoUrl: preUrl,
-            postPhotoUrl: postUrl,
-            exifGpsDeltaMeters: deltaMeters,
-            timestampAnomaly: false,
-            phashDistance: 18,
-            status: 'pending_review',
-          });
-        }
-      }
-
-      setPhotoReviews(reviews);
     } catch (err) {
       console.error('Failed to load operations metrics:', err);
     } finally {
@@ -315,7 +219,7 @@ export default function OperationsMetricsView() {
 
   // Realtime subscription to live updates
   useAdminRealtime({
-    tables: ['requests', 'request_attachments'],
+    tables: ['requests'],
     onChange: () => {
       loadMetrics();
     },
@@ -331,17 +235,7 @@ export default function OperationsMetricsView() {
     );
   };
 
-  const handlePhotoReviewAction = (id: string, newStatus: 'approved' | 'dispute_opened') => {
-    setPhotoReviews((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, status: newStatus } : p)),
-    );
-    setAlertMsg(
-      `Photo evidence for case ${id} ${newStatus === 'approved' ? 'APPROVED' : 'ESCALATED TO DISPUTE'}. Audit entry recorded.`,
-    );
-  };
-
   const safeCollusionFlags = collusionFlags || [];
-  const safePhotoReviews = photoReviews || [];
   const safeVarianceSummaries = varianceSummaries || [];
 
   if (loading) {
@@ -363,7 +257,7 @@ export default function OperationsMetricsView() {
           The Analyzer &amp; Business Guard
         </h2>
         <p className="text-sm text-slate-500">
-          Fare variance distribution, Poisson pairwise collusion detector, and photo integrity comparator.
+          Fare variance distribution and Poisson pairwise collusion anomaly detector.
         </p>
       </div>
 
@@ -391,7 +285,7 @@ export default function OperationsMetricsView() {
               1. Fare Variance Monitor (Estimated vs Realized)
             </h3>
             <p className="text-xs text-slate-500">
-              Tracking average deviation (final_price / estimated_total). Variances &gt; 50% flagged for administrative review per RULES_AND_LOGIC.md §9.
+              Tracking completed jobs average deviation (final_price / estimated_total). Variances &gt; 50% flagged for administrative review per RULES_AND_LOGIC.md §9.
             </p>
           </div>
           <span className="self-start sm:self-auto rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-bold text-slate-700">
@@ -412,7 +306,7 @@ export default function OperationsMetricsView() {
               >
                 <div className="flex items-center justify-between">
                   <p className="font-display font-700 text-[#0B132B] text-base">{summary.category}</p>
-                  <span className="text-xs font-semibold text-slate-500">{summary.jobCount} jobs</span>
+                  <span className="text-xs font-semibold text-slate-500">{summary.jobCount} completed jobs</span>
                 </div>
 
                 <div className="space-y-1 text-xs">
@@ -431,7 +325,9 @@ export default function OperationsMetricsView() {
                         summary.avgVariancePercent > 25 ? 'text-amber-600' : 'text-emerald-600'
                       }`}
                     >
-                      {summary.avgVariancePercent >= 0
+                      {summary.jobCount === 0
+                        ? '0%'
+                        : summary.avgVariancePercent >= 0
                         ? `+${summary.avgVariancePercent}%`
                         : `${summary.avgVariancePercent}%`}
                     </span>
@@ -557,112 +453,6 @@ export default function OperationsMetricsView() {
                     </button>
                   </div>
                 )}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* SECTION 3: Photo Mismatch & Integrity Comparator */}
-      <div className="space-y-4 pt-4 border-t border-slate-200">
-        <div>
-          <h3 className="font-display text-lg font-800 text-[#0B132B]">
-            3. Photo Mismatch &amp; Integrity Comparator
-          </h3>
-          <p className="text-xs text-slate-500">
-            Side-by-side inspection for pre-work vs post-work photos. EXIF GPS delta &gt; 150m or pHash = 0 (reused photo) routes to review.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {safePhotoReviews.length === 0 ? (
-            <div className="col-span-full rounded-2xl border-2 border-dashed border-slate-200 bg-white p-8 text-center text-slate-500 text-xs font-medium">
-              No photo mismatch reviews pending.
-            </div>
-          ) : (
-            safePhotoReviews.map((review) => (
-              <div
-                key={review.id}
-                className="rounded-2xl border border-slate-200 bg-white p-5 space-y-3 shadow-sm"
-              >
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <div>
-                    <p className="font-display font-700 text-[#0B132B] text-sm">
-                      {review.serviceCategory} · {review.requestId}
-                    </p>
-                    <p className="text-xs text-slate-500 font-medium">
-                      Tech: {review.technicianName} · Client: {review.clientName}
-                    </p>
-                  </div>
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-xs font-bold uppercase ${
-                      review.status === 'pending_review'
-                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    }`}
-                  >
-                    {review.status.replace(/_/g, ' ')}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <p className="text-[11px] text-slate-500 font-semibold">Pre-Work Inspection (EXIF Verified)</p>
-                    <div className="h-28 w-full rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
-                      <img
-                        src={review.prePhotoUrl}
-                        alt="Pre-work site inspection"
-                        className="h-full w-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                      <span className="text-[10px] text-slate-400 font-medium p-2 text-center">Pre-Work Evidence</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[11px] text-slate-500 font-semibold">Post-Work Completion Proof</p>
-                    <div className="h-28 w-full rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
-                      <img
-                        src={review.postPhotoUrl}
-                        alt="Post-work site completion"
-                        className="h-full w-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLElement).style.display = 'none';
-                        }}
-                      />
-                      <span className="text-[10px] text-slate-400 font-medium p-2 text-center">Post-Work Proof</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs space-y-1">
-                  <div className="flex justify-between text-slate-700 font-medium">
-                    <span>pHash Distance:</span>
-                    <span className="font-mono font-bold text-amber-700">{review.phashDistance}</span>
-                  </div>
-                  <div className="flex justify-between text-slate-500 text-[11px]">
-                    <span>Geotag Delta:</span>
-                    <span className="text-emerald-700 font-bold">{review.exifGpsDeltaMeters}m from site</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => handlePhotoReviewAction(review.id, 'approved')}
-                    className="flex-1 rounded-xl border border-slate-200 bg-white py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
-                  >
-                    Accept Evidence
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handlePhotoReviewAction(review.id, 'dispute_opened')}
-                    className="flex-1 rounded-xl bg-rose-600 py-2 text-xs font-bold text-white hover:bg-rose-700 transition-colors shadow-sm"
-                  >
-                    Open Fraud Inquiry
-                  </button>
-                </div>
               </div>
             ))
           )}

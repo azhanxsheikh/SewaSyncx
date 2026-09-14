@@ -35,4 +35,10 @@ begin
       for select to authenticated
       using (private.is_platform_staff());
   end if;
+
+  if not exists (select 1 from pg_policy where polrelid = 'public.notifications'::regclass and polname = 'notifications_insert_staff') then
+    create policy "notifications_insert_staff" on public.notifications
+      for insert to authenticated
+      with check (private.is_platform_staff());
+  end if;
 end $$;

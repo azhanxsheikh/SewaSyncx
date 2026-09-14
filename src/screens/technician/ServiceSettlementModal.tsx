@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react"
 import type { DispatchJob, PriceAdjustmentReason } from "../../types/dispatch"
+import { uploadPostWorkMedia } from "../../lib/sosMedia"
+import { useAuth } from "../../context/AuthContext"
 
 export interface ServiceSettlementModalProps {
   isOpen: boolean
@@ -14,10 +16,13 @@ export default function ServiceSettlementModal({
   job,
   onSettled,
 }: ServiceSettlementModalProps) {
+  const { user, userId } = useAuth()
   const [finalPriceInput, setFinalPriceInput] = useState("")
   const [adjustmentReason, setAdjustmentReason] = useState<PriceAdjustmentReason | undefined>(undefined)
   const [adjustmentNotes, setAdjustmentNotes] = useState("")
   const [confirmedVariance, setConfirmedVariance] = useState(false)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [previewUrls, setPreviewUrls] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
@@ -26,6 +31,8 @@ export default function ServiceSettlementModal({
       setAdjustmentReason(job.priceAdjustmentReason)
       setAdjustmentNotes(job.priceAdjustmentNotes ?? "")
       setConfirmedVariance(false)
+      setSelectedFiles([])
+      setPreviewUrls([])
       setIsSubmitting(false)
     }
   }, [isOpen, job])
@@ -37,6 +44,19 @@ export default function ServiceSettlementModal({
   const baseEstimate = job.estimatedTotal ?? 0
   const delta = isValidPrice ? parsedPrice - baseEstimate : 0
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return
+    const newFiles = Array.from(e.target.files)
+    setSelectedFiles((prev) => [...prev, ...newFiles])
+    const newUrls = newFiles.map((f) => URL.createObjectURL(f))
+    setPreviewUrls((prev) => [...prev, ...newUrls])
+  }
+
+  const handleRemoveFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
+    setPreviewUrls((prev) => prev.filter((_, i) => i !== index))
+  }
+
   const handleSettle = async () => {
     if (!isValidPrice) return
     if (delta !== 0 && !confirmedVariance) return
@@ -44,6 +64,10 @@ export default function ServiceSettlementModal({
 
     setIsSubmitting(true)
     try {
+      const activeTechId = user?.id || userId
+      if (selectedFiles.length > 0 && activeTechId) {
+        await uploadPostWorkMedia(job.id, activeTechId, selectedFiles)
+      }
       await onSettled(parsedPrice, adjustmentReason, adjustmentNotes)
       onClose()
     } finally {
@@ -174,6 +198,48 @@ export default function ServiceSettlementModal({
               placeholder="e.g. Replaced burnt capacitor with client approval"
               className="w-full rounded-xl bg-slate-50 border border-slate-200 px-4 py-2.5 text-slate-900 font-medium focus:bg-white focus:border-red-500 focus:ring-2 focus:ring-red-500/20 focus:outline-none placeholder:text-slate-400 font-normal transition-all"
             />
+          </div>
+
+          {/* Post-Work Verification Photos */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Post-work verification photo (optional / recommended)
+            </label>
+            <div className="space-y-2">
+              <label className="flex flex-col items-center justify-center p-3 rounded-xl border-2 border-dashed border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100/80 cursor-pointer transition-colors text-center">
+                <span className="text-xl mb-1">📷</span>
+                <span className="text-xs font-semibold text-slate-700">
+                  {selectedFiles.length > 0 ? "Add more photos" : "Upload completion proof photo"}
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  Stored securely in request-attachments for settlement & audit records
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
+
+              {previewUrls.length > 0 && (
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  {previewUrls.map((url, idx) => (
+                    <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 bg-slate-100 group">
+                      <img src={url} alt={`Post work ${idx + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFile(idx)}
+                        className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Client Confirmation Checkbox */}

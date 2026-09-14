@@ -88,7 +88,7 @@ export default function SOSConfirmation({ navigate, selectedService, priority }:
               description,
               estimated_total: (matchedCat.sos_base_price ?? 0) + (matchedCat.sos_emergency_fee ?? 0),
               symptoms: draftSymptoms.length ? draftSymptoms : [`Emergency assistance for ${safeService}`],
-              search_radius_km: 10,
+              search_radius_km: 20,
             })
             .select('id')
             .single();

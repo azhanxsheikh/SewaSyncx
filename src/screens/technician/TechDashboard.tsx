@@ -268,7 +268,7 @@ export default function TechDashboard({ onOpenAlerts, onOpenActive }: Props) {
           <p className="text-3xl mb-2">📡</p>
           <p className="font-semibold text-slate-800">You are online and ready for the next dispatch.</p>
           <p className="text-xs text-slate-500 mt-1">
-            New emergency requests within your 10 km operating zone will appear here immediately.
+            New emergency requests within your 20 km operating zone will appear here immediately.
           </p>
         </div>
       )}

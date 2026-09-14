@@ -8,12 +8,12 @@ export interface TechnicianComplianceItem {
   phone: string;
   category: string;
   categories: string[];
-  experienceYears: number;
   identityVerified: boolean;
   skillVerified: boolean;
   backgroundChecked: boolean;
   rating: number;
-  totalJobs: number;
+  reviewCount: number;
+  completedJobsCount: number;
   isOnline: boolean;
   activeMinutes: number;
   heatAdjustedCapMinutes: number;
@@ -28,13 +28,33 @@ export default function TechnicianComplianceRegistry() {
   const [notification, setNotification] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Pagination state (10 items / page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
+
+  // Fatigue Cooldown Timer (45 minutes = 2700 seconds countdown)
+  const [cooldownSeconds, setCooldownSeconds] = useState(45 * 60);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCooldownSeconds((prev) => (prev > 0 ? prev - 1 : 45 * 60));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTimer = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
   const loadTechnicians = useCallback(async () => {
     try {
-      // 1. Fetch technician profiles
+      // 1. Fetch technician profiles strictly from public.technician_profiles
       const { data: tpRows, error: tpErr } = await supabase
         .from('technician_profiles')
         .select('*')
-        .order('total_jobs', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (tpErr) throw tpErr;
       if (!tpRows || tpRows.length === 0) {
@@ -45,20 +65,24 @@ export default function TechnicianComplianceRegistry() {
 
       const techIds = tpRows.map((t) => t.id);
 
-      // 2. Fetch users, categories, and categories mapping in parallel
+      // 2. Fetch users, categories mapping, service categories, requests, and authentic reviews
       const [
         { data: userRows },
         { data: techCatRows },
         { data: catRows },
         { data: reqRows },
+        { data: reviewRows },
       ] = await Promise.all([
         supabase.from('users').select('id, name, phone').in('id', techIds),
         supabase.from('technician_categories').select('technician_id, category_id').in('technician_id', techIds),
         supabase.from('service_categories').select('id, name'),
-        // Fetch today's requests to compute fatigue
         supabase
           .from('requests')
           .select('id, technician_id, status, accepted_at, completed_at, created_at')
+          .in('technician_id', techIds),
+        supabase
+          .from('reviews')
+          .select('technician_id, rating')
           .in('technician_id', techIds),
       ]);
 
@@ -69,18 +93,28 @@ export default function TechnicianComplianceRegistry() {
       const availableCategories = ['all', ...(catRows || []).map((c) => c.name)];
       setCategories(availableCategories);
 
-      // Build category map per technician
+      // Map categories per technician (render all registered categories)
       const techToCatsMap = new Map<string, string[]>();
       (techCatRows || []).forEach((tc) => {
         const catName = catMap.get(tc.category_id);
         if (catName) {
           const existing = techToCatsMap.get(tc.technician_id) || [];
-          existing.push(catName);
+          if (!existing.includes(catName)) {
+            existing.push(catName);
+          }
           techToCatsMap.set(tc.technician_id, existing);
         }
       });
 
-      // Today's midnight timestamp for active minutes calculation
+      // Map authentic reviews per technician strictly from public.reviews
+      const techToReviewsMap = new Map<string, number[]>();
+      (reviewRows || []).forEach((r) => {
+        const list = techToReviewsMap.get(r.technician_id) || [];
+        list.push(r.rating);
+        techToReviewsMap.set(r.technician_id, list);
+      });
+
+      // Today's midnight timestamp for active shift minutes calculation
       const todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
       const todayStartTime = todayStart.getTime();
@@ -90,22 +124,31 @@ export default function TechnicianComplianceRegistry() {
         const assignedCats = techToCatsMap.get(tp.id) || [];
         const primaryCat = assignedCats[0] || 'General Service';
 
-        // Calculate fatigue: active minutes today from accepted_at to completed_at (or now())
-        let activeMinutes = 0;
+        // Authentic completed jobs count
         const techRequests = (reqRows || []).filter((r) => r.technician_id === tp.id);
+        const completedJobsCount = techRequests.filter((r) => r.status === 'completed').length;
 
-        for (const req of techRequests) {
-          if (!req.accepted_at) continue;
-          const acceptedTime = new Date(req.accepted_at).getTime();
-          if (acceptedTime < todayStartTime && req.completed_at) {
-            const completedTime = new Date(req.completed_at).getTime();
-            if (completedTime < todayStartTime) continue;
+        // Authentic rating calculation strictly from public.reviews
+        const reviews = techToReviewsMap.get(tp.id) || [];
+        const reviewCount = reviews.length;
+        const rating =
+          reviewCount > 0
+            ? Number((reviews.reduce((a, b) => a + b, 0) / reviewCount).toFixed(1))
+            : 0;
+
+        // Dynamic shift duration from today's active duty session
+        let activeMinutes = 0;
+        if (tp.is_online) {
+          for (const req of techRequests) {
+            if (!req.accepted_at) continue;
+            const acceptedTime = new Date(req.accepted_at).getTime();
+            // Only count work that started today
+            if (acceptedTime < todayStartTime) continue;
+
+            const endTime = req.completed_at ? new Date(req.completed_at).getTime() : Date.now();
+            const durationMins = Math.max(0, Math.round((endTime - acceptedTime) / 60000));
+            activeMinutes += durationMins;
           }
-
-          const startTime = Math.max(acceptedTime, todayStartTime);
-          const endTime = req.completed_at ? new Date(req.completed_at).getTime() : Date.now();
-          const durationMins = Math.max(0, Math.round((endTime - startTime) / 60000));
-          activeMinutes += durationMins;
         }
 
         return {
@@ -113,16 +156,16 @@ export default function TechnicianComplianceRegistry() {
           name: user?.name || `Technician (${tp.id.slice(0, 8)})`,
           phone: user?.phone || '+91-XXXXXXXXXX',
           category: primaryCat,
-          categories: assignedCats,
-          experienceYears: Number(tp.experience_years || 0),
+          categories: assignedCats.length > 0 ? assignedCats : [primaryCat],
           identityVerified: Boolean(tp.identity_verified),
           skillVerified: Boolean(tp.skill_verified),
           backgroundChecked: Boolean(tp.background_checked),
-          rating: Number(tp.rating || 0),
-          totalJobs: Number(tp.total_jobs || 0),
+          rating,
+          reviewCount,
+          completedJobsCount,
           isOnline: Boolean(tp.is_online),
           activeMinutes,
-          heatAdjustedCapMinutes: 480, // 8-hour shift cap under standard conditions
+          heatAdjustedCapMinutes: 480, // 8-hour shift cap
           throttleReason: !tp.is_online ? 'Manual administrator throttle' : undefined,
         };
       });
@@ -160,6 +203,7 @@ export default function TechnicianComplianceRegistry() {
           ? {
               ...item,
               isOnline: nextState,
+              activeMinutes: !nextState ? 0 : item.activeMinutes,
               throttleReason: !nextState ? 'Admin manual suspension applied' : undefined,
             }
           : item,
@@ -202,6 +246,18 @@ export default function TechnicianComplianceRegistry() {
       return true;
     });
   }, [safeRegistry, filterCategory, filterThrottledOnly]);
+
+  // Reset to page 1 on filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterCategory, filterThrottledOnly]);
+
+  // Pagination calculations (10 items / page)
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE));
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredItems.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredItems, currentPage]);
 
   const totalTechnicians = safeRegistry.length;
   const throttledCount = safeRegistry.filter((t) => !t.isOnline).length;
@@ -282,35 +338,40 @@ export default function TechnicianComplianceRegistry() {
         </div>
       )}
 
-      {/* Filter Options */}
-      <div className="flex items-center gap-3 text-xs">
-        <span className="text-slate-500 font-semibold">Quick Filters:</span>
-        <button
-          type="button"
-          onClick={() => setFilterThrottledOnly(!filterThrottledOnly)}
-          className={`rounded-xl px-3 py-1.5 font-bold transition-colors shadow-sm ${
-            filterThrottledOnly
-              ? 'bg-rose-50 text-rose-700 border border-rose-200'
-              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-          }`}
-        >
-          {filterThrottledOnly ? 'Showing Throttled Only' : 'Show Throttled Only'}
-        </button>
+      {/* Filter Options & Pagination Header */}
+      <div className="flex items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-3">
+          <span className="text-slate-500 font-semibold">Quick Filters:</span>
+          <button
+            type="button"
+            onClick={() => setFilterThrottledOnly(!filterThrottledOnly)}
+            className={`rounded-xl px-3 py-1.5 font-bold transition-colors shadow-sm ${
+              filterThrottledOnly
+                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            {filterThrottledOnly ? 'Showing Throttled Only' : 'Show Throttled Only'}
+          </button>
+        </div>
+
+        <span className="text-slate-500 font-semibold">
+          Showing {filteredItems.length} technician{filteredItems.length === 1 ? '' : 's'} (Page {currentPage} of {totalPages})
+        </span>
       </div>
 
       {/* Technician Cards */}
       <div className="space-y-4">
-        {filteredItems.length === 0 ? (
+        {paginatedItems.length === 0 ? (
           <div className="rounded-2xl border-2 border-dashed border-slate-200 bg-white p-12 text-center text-slate-500 font-medium">
             No technicians match the current compliance filters.
           </div>
         ) : (
-          filteredItems.map((tech) => {
-            const dutyPercent = Math.min(
-              100,
-              Math.round((tech.activeMinutes / tech.heatAdjustedCapMinutes) * 100),
-            );
-            const isNearCap = dutyPercent >= 80;
+          paginatedItems.map((tech) => {
+            const dutyPercent = !tech.isOnline
+              ? 0
+              : Math.min(100, Math.round((tech.activeMinutes / tech.heatAdjustedCapMinutes) * 100));
+            const isNearCap = tech.isOnline && (dutyPercent >= 80 || tech.activeMinutes > 420);
 
             return (
               <div
@@ -323,17 +384,36 @@ export default function TechnicianComplianceRegistry() {
                     <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#0B132B] font-display font-800 text-white text-base shadow-sm">
                       {tech.name.charAt(0).toUpperCase()}
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
                         <p className="font-display font-700 text-[#0B132B] text-base">{tech.name}</p>
-                        <span className="rounded-full bg-sky-50 border border-sky-200 px-2.5 py-0.5 text-xs font-semibold text-sky-700">
-                          {tech.category}
-                        </span>
+                        {/* High-contrast badges for ALL registered categories */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {tech.categories.map((catName) => (
+                            <span
+                              key={catName}
+                              className="rounded-full bg-[#0B132B] text-white border border-[#0B132B] px-2.5 py-0.5 text-[11px] font-bold shadow-xs"
+                            >
+                              {catName}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                      <p className="text-xs text-slate-500 mt-0.5 font-medium">
-                        {tech.phone} · ⭐ {tech.rating > 0 ? tech.rating.toFixed(1) : 'New'} ({tech.totalJobs} jobs)
-                        {tech.experienceYears > 0 && ` · ${tech.experienceYears} yrs exp`}
-                      </p>
+
+                      {/* Clean authentic metrics: rating or No reviews yet badge, and real completed jobs */}
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 font-medium">
+                        <span>{tech.phone}</span>
+                        <span>·</span>
+                        {tech.reviewCount > 0 ? (
+                          <span className="font-semibold text-slate-800">
+                            ★ {tech.rating.toFixed(1)} ({tech.reviewCount} {tech.reviewCount === 1 ? 'review' : 'reviews'})
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-500 font-medium">No reviews yet</span>
+                        )}
+                        <span>·</span>
+                        <span>{tech.completedJobsCount} {tech.completedJobsCount === 1 ? 'completed job' : 'completed jobs'}</span>
+                      </div>
                     </div>
                   </div>
 
@@ -365,73 +445,83 @@ export default function TechnicianComplianceRegistry() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                   <div>
                     <span className="text-slate-500 font-semibold block mb-1">Aadhaar (UIDAI Token)</span>
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-bold ${
-                        tech.identityVerified
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}
-                    >
-                      {tech.identityVerified ? '✓ Verified (Tokenized)' : 'Pending'}
-                    </span>
+                    {tech.identityVerified ? (
+                      <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-600">
+                        ✓ Verified
+                      </span>
+                    ) : (
+                      <span className="text-amber-700 bg-amber-50 border border-amber-200 inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-600">
+                        ⏳ Pending Verification
+                      </span>
+                    )}
                   </div>
 
                   <div>
                     <span className="text-slate-500 font-semibold block mb-1">Police Background Verification</span>
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-bold ${
-                        tech.backgroundChecked
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}
-                    >
-                      {tech.backgroundChecked ? '✓ Cleared' : 'In Progress'}
-                    </span>
+                    {tech.backgroundChecked ? (
+                      <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-600">
+                        ✓ Cleared
+                      </span>
+                    ) : (
+                      <span className="text-slate-600 bg-slate-100 border border-slate-200 inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-600">
+                        Not Submitted
+                      </span>
+                    )}
                   </div>
 
                   <div>
                     <span className="text-slate-500 font-semibold block mb-1">Physical Tool Attestation</span>
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-bold ${
-                        tech.skillVerified
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-rose-50 text-rose-700 border border-rose-200'
-                      }`}
-                    >
-                      {tech.skillVerified ? '✓ Certified On-Site' : 'Expired / Pending'}
-                    </span>
+                    {tech.skillVerified ? (
+                      <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-600">
+                        ✓ Certified On-Site
+                      </span>
+                    ) : (
+                      <span className="text-slate-600 bg-slate-100 border border-slate-200 inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-600">
+                        Unverified
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                {/* Row 3: Live Fatigue & Duty-Time Tracker */}
-                <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 space-y-2">
+                {/* Row 3: Live Fatigue & Duty-Time Tracker with Real Shift Minutes */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 space-y-2.5">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-[#0B132B]">
                       Fatigue Monitor (Consecutive Shift Minutes)
                     </span>
-                    <span className={`font-semibold ${isNearCap ? 'text-amber-700 font-bold' : 'text-slate-500'}`}>
-                      {tech.activeMinutes} / {tech.heatAdjustedCapMinutes} min (Cap adjusted for extreme heat)
+                    <span className={`font-semibold ${!tech.isOnline ? 'text-slate-400 font-medium' : isNearCap ? 'text-amber-700 font-bold' : 'text-slate-500'}`}>
+                      {!tech.isOnline
+                        ? '0 / 480 min (Offline)'
+                        : `${tech.activeMinutes} / ${tech.heatAdjustedCapMinutes} min`}
                     </span>
                   </div>
 
                   <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
                     <div
                       className={`h-full transition-all duration-300 ${
-                        dutyPercent > 90
+                        !tech.isOnline
+                          ? 'bg-slate-300'
+                          : dutyPercent > 90 || tech.activeMinutes > 420
                           ? 'bg-rose-500'
-                          : dutyPercent > 70
-                          ? 'bg-amber-500'
                           : 'bg-emerald-500'
                       }`}
-                      style={{ width: `${Math.max(4, dutyPercent)}%` }}
+                      style={{ width: `${!tech.isOnline ? 0 : Math.max(0, dutyPercent)}%` }}
                     />
                   </div>
 
+                  {/* Active Cooldown Timer (only when duty > 420 min or near cap while online) */}
                   {isNearCap && (
-                    <div className="rounded-lg bg-amber-50 border border-amber-200 p-2 text-[11px] text-amber-800 font-medium flex items-center gap-1.5">
-                      <span>⚠️</span>
-                      <span>
-                        Fatigue warning: Approaching mandatory 45-minute cooling rest interval per cooperative bylaws.
+                    <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5 text-xs text-amber-900 font-semibold flex items-center justify-between shadow-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-600 font-bold text-sm">⏱</span>
+                        <span>
+                          Cooling rest active:{' '}
+                          <span className="font-mono font-bold text-amber-950">{formatTimer(cooldownSeconds)}</span>{' '}
+                          remaining before next dispatch eligibility
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded font-bold uppercase">
+                        Bylaw Mandate
                       </span>
                     </div>
                   )}
@@ -441,6 +531,31 @@ export default function TechnicianComplianceRegistry() {
           })
         )}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+          <button
+            type="button"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="rounded-lg px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            ← Prev
+          </button>
+          <span className="text-xs font-semibold text-slate-600">
+            Page {currentPage} of {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage >= totalPages}
+            className="rounded-lg px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Next →
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -102,7 +102,7 @@ export default function FamilySOS({
           area: member.area,
           estimated_total: (cat.sos_base_price ?? 0) + (cat.sos_emergency_fee ?? 0),
           symptoms: [`Emergency assistance requested for ${member.name} (${member.relation})`],
-          search_radius_km: 10,
+          search_radius_km: 20,
         })
         if (insertError) console.error("[family-sos] request not persisted", insertError.message)
       } else {

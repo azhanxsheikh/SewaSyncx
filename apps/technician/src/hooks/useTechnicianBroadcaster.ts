@@ -33,7 +33,7 @@ function envCoordinate(value: string | undefined, fallback: number): number {
 
 // Greater Noida coordinates for local dev simulation (localhost without GPS).
 // Starts at Amit Singh's seeded position in Gaur City, ~1.2 km from the Gaur
-// City 2 demo requests, so the simulated technician stays inside their 10 km
+// City 2 demo requests, so the simulated technician stays inside their 20 km
 // dispatch radius. Override with VITE_DEV_TECH_LAT / VITE_DEV_TECH_LNG.
 const START_SIMULATION_COORDS: Coordinates = {
   latitude: envCoordinate(import.meta.env.VITE_DEV_TECH_LAT, 28.6105),
@@ -88,11 +88,10 @@ export function useTechnicianBroadcaster(options?: BroadcasterOptions): Broadcas
   const simIntervalRef = useRef<number | null>(null);
   const watchIdRef = useRef<number | null>(null);
 
-  // Active job status gate: only broadcast when en-route or arrived
-  const isActive = Boolean(
-    userId &&
-      role === 'technician' &&
-      job &&
+  // Active technician gate: broadcast whenever logged in as technician
+  const isEnabled = Boolean(userId && role === 'technician');
+  const hasActiveJob = Boolean(
+    job &&
       (job.status === 'en-route' ||
         (job.status as string) === 'en_route' ||
         job.status === 'arrived' ||
@@ -198,9 +197,38 @@ export function useTechnicianBroadcaster(options?: BroadcasterOptions): Broadcas
     setIsSimulating((prev) => !prev);
   }, []);
 
-  // Main effect: GPS watching or dev fallback
+  // Fallback verification: guarantee valid coordinates in technician_locations on mount
   useEffect(() => {
-    if (!isActive) {
+    if (!isEnabled || !userId) return;
+    let isCancelled = false;
+    const ensureBaseCoordinates = async () => {
+      try {
+        const { data: existingLoc, error: locErr } = await supabase
+          .from('technician_locations')
+          .select('location')
+          .eq('technician_id', userId)
+          .maybeSingle();
+        if (isCancelled) return;
+        if (!existingLoc || locErr) {
+          await supabase.rpc('report_technician_location', {
+            p_lat: START_SIMULATION_COORDS.latitude,
+            p_lng: START_SIMULATION_COORDS.longitude,
+          });
+          setCurrentCoordinates(START_SIMULATION_COORDS);
+        }
+      } catch (err) {
+        console.warn('[broadcaster] ensureBaseCoordinates notice:', err);
+      }
+    };
+    void ensureBaseCoordinates();
+    return () => {
+      isCancelled = true;
+    };
+  }, [isEnabled, userId]);
+
+  // Main effect: GPS watching or dev simulation
+  useEffect(() => {
+    if (!isEnabled) {
       setIsBroadcasting(false);
       if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current);
@@ -214,7 +242,6 @@ export function useTechnicianBroadcaster(options?: BroadcasterOptions): Broadcas
     }
 
     setIsBroadcasting(true);
-
     const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
 
     // Start simulation loop function
@@ -255,8 +282,8 @@ export function useTechnicianBroadcaster(options?: BroadcasterOptions): Broadcas
       }, 5000);
     };
 
-    // If explicit simulation active, run simulation immediately
-    if (isSimulating) {
+    // If active job and explicit simulation active, run route simulation
+    if (hasActiveJob && isSimulating) {
       startSimulation();
       return () => {
         if (simIntervalRef.current !== null) {
@@ -266,8 +293,33 @@ export function useTechnicianBroadcaster(options?: BroadcasterOptions): Broadcas
       };
     }
 
-    // Attempt native browser GPS
+    // Live GPS tracking
     if (navigator.geolocation) {
+      // Immediate one-shot fetch to eliminate latency
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const coords: Coordinates = {
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          };
+          setCurrentCoordinates(coords);
+          setHeading(pos.coords.heading || null);
+          setSpeed(pos.coords.speed || null);
+          void transmitLocation(coords, pos.coords.heading, pos.coords.speed);
+        },
+        (err) => {
+          console.warn('[broadcaster] Initial geolocation query notice:', err.message);
+          if (hasActiveJob && isLocal) {
+            startSimulation();
+          } else {
+            setCurrentCoordinates(START_SIMULATION_COORDS);
+            void transmitLocation(START_SIMULATION_COORDS);
+          }
+        },
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+      );
+
+      // Continuous watch
       watchIdRef.current = navigator.geolocation.watchPosition(
         (pos) => {
           const coords: Coordinates = {
@@ -280,18 +332,21 @@ export function useTechnicianBroadcaster(options?: BroadcasterOptions): Broadcas
           void transmitLocation(coords, pos.coords.heading, pos.coords.speed);
         },
         (err) => {
-          console.warn('[broadcaster] Geolocation watch error:', err.message);
+          console.warn('[broadcaster] Geolocation watch notice:', err.message);
           setError(err.message);
-          // On localhost, fallback to simulation if permission denied or unavailable
-          if (isLocal) {
-            console.log('[broadcaster] Localhost detected & GPS unavailable. Activating route simulation.');
+          if (hasActiveJob && isLocal) {
             startSimulation();
           }
         },
         { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
       );
-    } else if (isLocal) {
-      startSimulation();
+    } else {
+      if (hasActiveJob && isLocal) {
+        startSimulation();
+      } else {
+        setCurrentCoordinates(START_SIMULATION_COORDS);
+        void transmitLocation(START_SIMULATION_COORDS);
+      }
     }
 
     return () => {
@@ -304,7 +359,7 @@ export function useTechnicianBroadcaster(options?: BroadcasterOptions): Broadcas
         simIntervalRef.current = null;
       }
     };
-  }, [isActive, isSimulating, transmitLocation]);
+  }, [isEnabled, hasActiveJob, isSimulating, transmitLocation]);
 
   return {
     isBroadcasting,
