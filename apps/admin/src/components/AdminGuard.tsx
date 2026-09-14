@@ -18,9 +18,9 @@ export function AdminGuard({ children }: AdminGuardProps) {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
-        <div className="flex flex-col items-center gap-3 text-slate-400">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-[#F4F7FB]">
+        <div className="flex flex-col items-center gap-3 text-slate-600">
+          <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
           <p className="text-sm font-medium">Verifying administrative credentials...</p>
         </div>
       </div>
@@ -33,7 +33,7 @@ export function AdminGuard({ children }: AdminGuardProps) {
         portal="admin"
         title="SewaSync Ops Control"
         subtitle="Staff & Administrator Sign-in"
-        theme="dark"
+        theme="light"
         initialError={deniedMsg}
         onSuccess={() => setDeniedMsg(null)}
       />
@@ -46,7 +46,7 @@ export function AdminGuard({ children }: AdminGuardProps) {
         portal="admin"
         title="SewaSync Ops Control"
         subtitle="Staff & Administrator Sign-in"
-        theme="dark"
+        theme="light"
         initialError="ACCESS DENIED: Insufficient administrative privileges."
       />
     );
