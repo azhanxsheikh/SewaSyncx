@@ -5,14 +5,26 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
-import siteConfiguration from './.figma/make/site.json'
+const siteConfiguration = {
+  description: 'Enables users to quickly request emergency home repairs, track verified technicians live, approve costs, and complete services with transparent billing.',
+  robots: {
+    index: false,
+  },
+  accessibility: {
+    addBypassLinks: false,
+    ignoreReducedMotion: false,
+  },
+}
 
-const dispatchStatePath = path.resolve(__dirname, '.figma/make/dispatch-state.json')
+const dispatchStatePath = path.resolve(__dirname, 'node_modules/.cache/dispatch-state.json')
 
 function dispatchBridge(): Plugin {
   const readState = () => {
     try {
-      return JSON.parse(fs.readFileSync(dispatchStatePath, 'utf8'))
+      if (fs.existsSync(dispatchStatePath)) {
+        return JSON.parse(fs.readFileSync(dispatchStatePath, 'utf8'))
+      }
+      return null
     } catch {
       return null
     }
@@ -47,6 +59,7 @@ function dispatchBridge(): Plugin {
         if (request.method === 'POST') {
           try {
             const body = JSON.parse(await readBody(request))
+            fs.mkdirSync(path.dirname(dispatchStatePath), { recursive: true })
             fs.writeFileSync(dispatchStatePath, JSON.stringify(body), 'utf8')
             response.statusCode = 204
             response.end()

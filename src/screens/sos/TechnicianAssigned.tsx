@@ -85,7 +85,8 @@ export default function TechnicianAssigned({ navigate }: Props) {
               />
             </svg>
             <p className="text-sm font-600">
-              Technician assigned! {tech.name} is on the way.
+              Technician assigned! {job?.technicianName || tech.name} is on the
+              way.
             </p>
           </div>
         </div>
@@ -101,7 +102,7 @@ export default function TechnicianAssigned({ navigate }: Props) {
             <div>
               <p className="text-gray-500 text-xs">Your technician</p>
               <h2 className="font-display font-800 text-xl text-gray-900">
-                {tech.name}
+                {job?.technicianName || tech.name}
               </h2>
             </div>
             <div className="text-right">
@@ -135,7 +136,9 @@ export default function TechnicianAssigned({ navigate }: Props) {
           <div className="mt-4 bg-gray-50 rounded-xl p-3 flex items-center gap-3">
             <span className="text-2xl">🛵</span>
             <div>
-              <p className="text-sm font-600 text-gray-800">{tech.vehicle}</p>
+              <p className="text-sm font-600 text-gray-800">
+                {job?.technicianVehicle || tech.vehicle}
+              </p>
               <p className="text-xs text-gray-400">Technician vehicle</p>
             </div>
           </div>

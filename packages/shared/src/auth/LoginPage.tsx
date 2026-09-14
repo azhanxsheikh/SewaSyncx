@@ -22,7 +22,7 @@ export function LoginPage({
   onSuccess,
   onSignUpClick,
 }: LoginPageProps) {
-  const isDark = theme ? theme === 'dark' : portal !== 'client';
+  const isDark = theme ? theme === 'dark' : portal === 'admin';
   const { signOut } = useAuth();
 
   const defaultTitle =
@@ -65,6 +65,7 @@ export function LoginPage({
     });
 
     if (signInError) {
+      console.error("SUPABASE AUTH/DB ERROR:", signInError);
       setError(signInError.message);
       setSubmitting(false);
       return;
@@ -229,7 +230,11 @@ export function LoginPage({
                 <button
                   type="button"
                   onClick={onSignUpClick}
-                  className="text-xs font-600 text-emerald-400 hover:text-emerald-300 transition focus:outline-none"
+                  className={`text-xs font-600 transition focus:outline-none ${
+                    isDark
+                      ? 'text-emerald-400 hover:text-emerald-300'
+                      : 'text-emerald-600 hover:text-emerald-700 font-bold'
+                  }`}
                 >
                   Join as a Cooperative Worker? <span className="underline font-700">Register Here</span>
                 </button>

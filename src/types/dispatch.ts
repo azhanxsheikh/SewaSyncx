@@ -7,13 +7,7 @@ export type ExecutionStep = "accepted" | "en-route" | "arrived" | "in-progress" 
 // Mirrors the database enum public.price_adjustment_reason exactly
 // (supabase/migrations/20260912000001_core_schema.sql). Only meaningful
 // when final_price exceeds estimatedTotal — see settle_job_payment.
-export type PriceAdjustmentReason =
-  | "additional_parts"
-  | "additional_labor_time"
-  | "access_difficulty"
-  | "misdiagnosis_correction"
-  | "customer_requested_scope_change"
-  | "other"
+export type PriceAdjustmentReason = "additional_parts" | "additional_labor_time" | "access_difficulty" | "misdiagnosis_correction" | "customer_requested_scope_change" | "other"
 
 /**
  * Evidence media uploaded to the private `sos-media` bucket (DATABASE §13) and
@@ -56,6 +50,12 @@ export interface DispatchJob {
   executionStep: ExecutionStep
   technicianId?: string
   technicianName?: string
+  technicianVehicle?: string
+  technicianRating?: number
+  technicianPhone?: string
+  technicianCategory?: string
+  technicianTotalJobs?: number
+  technicianPhoto?: string
   attachments: DispatchAttachment[]
   landmarkAndInstructions?: string
 }
@@ -98,12 +98,17 @@ interface DispatchEventPayload {
   status?: JobStatus
 }
 
-export type DispatchEvent =
-  | (DispatchEventPayload & { type: "job-created"; job: DispatchJob })
-  | (DispatchEventPayload & { type: "job-updated"; job: DispatchJob })
-  | (DispatchEventPayload & { type: "NEW_REQUEST"; request: DispatchJob })
-  | (DispatchEventPayload & {
-    type: "ACCEPTED" | "STATUS"
-    requestId: string
-    status: JobStatus
-  })
+export type DispatchEvent = DispatchEventPayload & {
+  type: "job-created"
+  job: DispatchJob
+} | DispatchEventPayload & {
+  type: "job-updated"
+  job: DispatchJob
+} | DispatchEventPayload & {
+  type: "NEW_REQUEST"
+  request: DispatchJob
+} | DispatchEventPayload & {
+  type: "ACCEPTED" | "STATUS"
+  requestId: string
+  status: JobStatus
+}

@@ -12,7 +12,7 @@ export function LoginPage(props: TechnicianLoginPageProps) {
       <SharedLoginPage
         title="SewaSync Technician"
         subtitle="Sign in to see your live dispatch feed"
-        theme="dark"
+        theme="light"
         {...props}
         portal="technician"
         onSignUpClick={() => setIsSignUpOpen(true)}

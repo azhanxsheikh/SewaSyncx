@@ -231,8 +231,12 @@ export function ActiveTechnicianJobProvider({ children }: { children: ReactNode 
     if (seq !== refreshSeq.current) return;
     if (pendingErr) console.warn('[technician] pending request query failed:', pendingErr.message);
 
-    const pending = (pendingRows as unknown as RequestWithJoins[] | null)?.find(
-      (row) => !declinedIds.current.has(row.id),
+    const pending = (pendingRows as unknown as (RequestWithJoins & { request_technician_dismissals?: Array<{ technician_id: string }> | null })[] | null)?.find(
+      (row) => {
+        if (declinedIds.current.has(row.id)) return false;
+        if (Array.isArray(row.request_technician_dismissals) && row.request_technician_dismissals.length > 0) return false;
+        return true;
+      },
     );
     if (pending) {
       setPendingRequestId(pending.id);
@@ -398,10 +402,13 @@ export function ActiveTechnicianJobProvider({ children }: { children: ReactNode 
     if (!techId) return;
     const channel = supabase
       .channel(`technician-alerts-${techId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'requests', filter: 'status=eq.pending' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'requests' }, () => {
         void refresh();
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'requests', filter: `technician_id=eq.${techId}` }, () => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'requests' }, () => {
+        void refresh();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'request_technician_dismissals' }, () => {
         void refresh();
       })
       .on('system', {}, (payload: { extension?: string; status?: string }) => {

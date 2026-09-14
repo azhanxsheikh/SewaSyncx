@@ -206,8 +206,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       supabase.from('family_members').select('*').eq('owner_id', uid),
       supabase
         .from('requests')
-        .select('*, service_categories(name, icon), technician:technician_id(name)')
-        .eq('user_id', uid)
+        .select('*, service_categories(name, icon), technician:technician_id(id, name, phone)')
+        .or(`client_id.eq.${uid},user_id.eq.${uid}`)
         .order('created_at', { ascending: false }),
       supabase.from('reviews').select('rating').eq('client_id', uid),
       supabase
@@ -285,7 +285,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     type RequestWithJoins = RequestRow & {
       service_categories: { name: string; icon: string } | null;
-      technician: { name: string } | null;
+      technician: { id?: string; name: string; phone?: string } | null;
     };
     const requests = (requestRows.data ?? []) as unknown as RequestWithJoins[];
 
@@ -294,6 +294,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       service: r.service_categories?.name ?? 'Service',
       icon: r.service_categories?.icon ?? '🔧',
       technician: r.technician?.name ?? 'Unassigned',
+      technicianId: r.technician_id ?? r.technician?.id ?? undefined,
+      technicianPhone: r.technician?.phone ?? undefined,
       date: formatDate(r.created_at),
       status: formatStatus(r.status),
       rawStatus: r.status,
@@ -304,6 +306,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       priority: r.priority ?? undefined,
       estimatedTotal: r.estimated_total ? Number(r.estimated_total) : undefined,
       photos: (r as { photos?: string[] }).photos ?? [],
+      addressText: r.address_text ?? undefined,
+      addressNotes: r.address_notes ?? undefined,
+      addressLine: r.address_line ?? undefined,
+      area: r.area ?? undefined,
     }));
 
     const nonTerminalStatuses: RequestRow['status'][] = ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'];

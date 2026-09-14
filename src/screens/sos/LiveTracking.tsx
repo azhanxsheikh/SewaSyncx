@@ -108,11 +108,14 @@ export default function LiveTracking({ navigate }: Props) {
             roadDistanceKm={roadDistanceKm > 0 ? roadDistanceKm : undefined}
             serviceAddress={job?.location}
             technician={{
-              name: tech.name,
-              photo: tech.photo,
-              phone: tech.phone,
-              rating: typeof tech.rating === 'number' ? tech.rating : parseFloat(String(tech.rating)) || 4.9,
-              vehicle: tech.vehicle,
+              name: job?.technicianName || tech.name,
+              photo: job?.technicianPhoto || tech.photo,
+              phone: job?.technicianPhone || tech.phone,
+              rating:
+                typeof tech.rating === "number"
+                  ? tech.rating
+                  : parseFloat(String(tech.rating)) || 4.9,
+              vehicle: job?.technicianVehicle || tech.vehicle,
               experience: tech.experience,
             }}
             requestId={job?.id}
@@ -221,7 +224,7 @@ export default function LiveTracking({ navigate }: Props) {
                 <span className="text-amber-400">★</span>
                 <span>{tech.rating}</span>
                 <span>·</span>
-                <span>{tech.vehicle || 'Electrician'}</span>
+                <span>{tech.vehicle || "Electrician"}</span>
               </div>
             </div>
             <div className="text-right">
@@ -229,7 +232,9 @@ export default function LiveTracking({ navigate }: Props) {
                 {liveEtaMinutes > 0 ? `${liveEtaMinutes} min` : `${eta} min`}
               </div>
               <p className="text-xs text-gray-400">
-                {roadDistanceKm > 0 ? `${roadDistanceKm.toFixed(1)} km away` : tech.distance}
+                {roadDistanceKm > 0
+                  ? `${roadDistanceKm.toFixed(1)} km away`
+                  : tech.distance}
               </p>
             </div>
           </div>
@@ -238,7 +243,9 @@ export default function LiveTracking({ navigate }: Props) {
           <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-5">
             <div
               className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-full transition-all duration-2000"
-              style={{ width: `${(1 - (liveEtaMinutes > 0 ? liveEtaMinutes : eta) / initialEta) * 100}%` }}
+              style={{
+                width: `${(1 - (liveEtaMinutes > 0 ? liveEtaMinutes : eta) / initialEta) * 100}%`,
+              }}
             />
           </div>
 
@@ -263,7 +270,7 @@ export default function LiveTracking({ navigate }: Props) {
               <span className="text-xs text-blue-700 font-500">Chat</span>
             </button>
             <a
-              href={`tel:${tech.phone.replace(/[^0-9+]/g, '')}`}
+              href={`tel:${tech.phone.replace(/[^0-9+]/g, "")}`}
               className="flex flex-col items-center gap-1.5 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 transition-colors"
             >
               <svg
@@ -282,7 +289,7 @@ export default function LiveTracking({ navigate }: Props) {
               <span className="text-xs text-emerald-700 font-500">Call</span>
             </a>
             <a
-              href={`https://wa.me/${tech.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hi ${tech.name}, reaching out regarding my SOS emergency request (${job?.service || 'Service'}) at ${job?.location || 'my address'}.`)}`}
+              href={`https://wa.me/${tech.phone.replace(/[^0-9]/g, "")}?text=${encodeURIComponent(`Hi ${tech.name}, reaching out regarding my SOS emergency request (${job?.service || "Service"}) at ${job?.location || "my address"}.`)}`}
               target="_blank"
               rel="noreferrer"
               className="flex flex-col items-center gap-1.5 py-2.5 rounded-xl bg-green-50 hover:bg-green-100 transition-colors text-center"

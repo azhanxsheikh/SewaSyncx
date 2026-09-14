@@ -46,8 +46,8 @@ export function useBookings(): {
 
     const { data, error: qErr } = await supabase
       .from('requests')
-      .select('*, service_categories(name, icon), technician:technician_id(name)')
-      .eq('user_id', activeUid)
+      .select('*, service_categories(name, icon), technician:technician_id(id, name, phone)')
+      .or(`client_id.eq.${activeUid},user_id.eq.${activeUid}`)
       .order('created_at', { ascending: false });
 
     if (qErr) {
@@ -57,13 +57,15 @@ export function useBookings(): {
     } else {
       type RequestWithJoins = RequestRow & {
         service_categories: { name: string; icon: string } | null;
-        technician: { name: string } | null;
+        technician: { id?: string; name: string; phone?: string } | null;
       };
       const records: BookingRecord[] = ((data ?? []) as unknown as RequestWithJoins[]).map((r) => ({
         id: r.id,
         service: r.service_categories?.name ?? 'Emergency Service',
         icon: r.service_categories?.icon ?? '🔧',
         technician: r.technician?.name ?? 'Unassigned',
+        technicianId: r.technician_id ?? r.technician?.id ?? undefined,
+        technicianPhone: r.technician?.phone ?? undefined,
         date: formatDate(r.created_at),
         status: formatStatus(r.status),
         rawStatus: r.status,
@@ -74,6 +76,10 @@ export function useBookings(): {
         priority: r.priority ?? undefined,
         estimatedTotal: r.estimated_total ? Number(r.estimated_total) : undefined,
         photos: (r as { photos?: string[] }).photos ?? [],
+        addressText: r.address_text ?? undefined,
+        addressNotes: r.address_notes ?? undefined,
+        addressLine: r.address_line ?? undefined,
+        area: r.area ?? undefined,
       }));
       setBookings(records);
     }

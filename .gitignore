@@ -19,6 +19,7 @@ CLAUDE.md
 Thumbs.db
 
 # Supabase CLI local state
+.supabase/
 supabase/.temp/
 supabase/.branches/
 

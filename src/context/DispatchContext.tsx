@@ -162,8 +162,6 @@ function publish(event: DispatchEvent) {
 export function DispatchProvider({
   children,
   inboundSync = true,
-}: {
-  children: ReactNode
   /**
    * When false, the provider never adopts job state from other tabs
    * (BroadcastChannel, localStorage) or the dev bridge, and does not restore a
@@ -172,9 +170,13 @@ export function DispatchProvider({
    * replaces the whole job with whatever another tab last published, which
    * silently reverted the execution console. Outbound publishing is unchanged.
    */
+}: {
+  children: ReactNode
   inboundSync?: boolean
 }) {
-  const [job, setJob] = useState<DispatchJob | null>(() => (inboundSync ? readStoredJob() : null))
+  const [job, setJob] = useState<DispatchJob | null>(() =>
+    inboundSync ? readStoredJob() : null,
+  )
   const jobRef = useRef(job)
   jobRef.current = job
   const [sosDraft, setSosDraft] =
@@ -305,7 +307,9 @@ export function DispatchProvider({
   const updateJob = useCallback((patch: Partial<DispatchJob>) => {
     setJob((current) => {
       if (!current && !patch.id) return current
-      const next = current ? { ...current, ...patch, updatedAt: Date.now() } : (patch as DispatchJob)
+      const next = current
+        ? { ...current, ...patch, updatedAt: Date.now() }
+        : patch as DispatchJob
       writeStorage(STORAGE_KEY, next)
       publish({ type: "job-updated", job: next })
       void publishToDispatchBridge({ type: "job-updated", job: next })
@@ -366,8 +370,11 @@ export function DispatchProvider({
         serviceLatitude: input.serviceLatitude,
         serviceLongitude: input.serviceLongitude,
         landmarkAndInstructions: input.landmarkAndInstructions,
-        searchRadiusKm: 10,
-        estimatedTotal: estimateJobTotal(input.service, input.priority ?? "medium"),
+        searchRadiusKm: 20,
+        estimatedTotal: estimateJobTotal(
+          input.service,
+          input.priority ?? "medium",
+        ),
         createdAt: Date.now(),
         updatedAt: Date.now(),
         status: "requested",
@@ -415,9 +422,17 @@ export function DispatchProvider({
       const createdJob = createJob({
         ...input,
         location,
-        serviceLatitude: input.serviceLatitude ?? (requestedFor ? undefined : confirmedLocation.latitude),
-        serviceLongitude: input.serviceLongitude ?? (requestedFor ? undefined : confirmedLocation.longitude),
-        landmarkAndInstructions: input.landmarkAndInstructions ?? (requestedFor ? undefined : confirmedLocation.landmarkAndInstructions),
+        serviceLatitude:
+          input.serviceLatitude ??
+          (requestedFor ? undefined : confirmedLocation.latitude),
+        serviceLongitude:
+          input.serviceLongitude ??
+          (requestedFor ? undefined : confirmedLocation.longitude),
+        landmarkAndInstructions:
+          input.landmarkAndInstructions ??
+          (requestedFor
+            ? undefined
+            : confirmedLocation.landmarkAndInstructions),
         ...(requestedFor
           ? {
               customerName: requestedFor.name,
@@ -430,15 +445,27 @@ export function DispatchProvider({
             }
           : {}),
       })
-      if (createdJob.serviceLatitude === undefined || createdJob.serviceLongitude === undefined) {
+      if (
+        createdJob.serviceLatitude === undefined ||
+        createdJob.serviceLongitude === undefined
+      ) {
         void forwardGeocode(createdJob.location).then((coordinates) => {
           if (!coordinates) return
-          updateJob({ serviceLatitude: coordinates.latitude, serviceLongitude: coordinates.longitude })
+          updateJob({
+            serviceLatitude: coordinates.latitude,
+            serviceLongitude: coordinates.longitude,
+          })
         })
       }
       return createdJob
     },
-    [confirmedLocation.fullAddress, confirmedLocation.latitude, confirmedLocation.longitude, createJob, updateJob],
+    [
+      confirmedLocation.fullAddress,
+      confirmedLocation.latitude,
+      confirmedLocation.longitude,
+      createJob,
+      updateJob,
+    ],
   )
 
   const value = useMemo<DispatchContextValue>(
@@ -450,12 +477,16 @@ export function DispatchProvider({
       assignedTechnician: job?.technicianId
         ? {
             id: job.technicianId,
-            name: job.technicianName ?? "Rahul Kumar",
-            rating: 4.9,
-            vehicle: "Honda Activa · DL 5S 4521",
+            name: job.technicianName ?? "Kevin",
+            rating: job.technicianRating ?? 4.9,
+            vehicle:
+              job.technicianVehicle ?? "Two-Wheeler / Scooter · UP 16 AB 1234",
             eta: "8 min",
             distance: "1.8 km",
-            specializations: ["Electrical", "Emergency repair"],
+            specializations: [
+              job.technicianCategory ?? "AC Repair",
+              "Emergency repair",
+            ],
           }
         : null,
       jobHistory:
@@ -480,7 +511,10 @@ export function DispatchProvider({
         }),
       acceptJob: () => {
         if (job?.id) {
-          void acceptRequestRpc(job.id, "t1").then((res) => {
+          void acceptRequestRpc(
+            job.id,
+            "4cbbcab2-4aad-4e8a-8d83-7dcdef3bd50a",
+          ).then((res) => {
             if (res.error) {
               console.warn("[dispatch] accept_request RPC error:", res.error)
             } else {
@@ -491,14 +525,20 @@ export function DispatchProvider({
         updateJob({
           status: "accepted",
           executionStep: "accepted",
-          technicianId: "t1",
-          technicianName: "Rahul Kumar",
+          technicianId: "4cbbcab2-4aad-4e8a-8d83-7dcdef3bd50a",
+          technicianName: "Kevin",
+          technicianVehicle: "Two-Wheeler / Scooter · UP 16 AB 1234",
+          technicianRating: 4.9,
+          technicianCategory: "AC Repair",
         })
       },
       declineJob: () => updateJob({ status: "declined" }),
       acceptRequest: () => {
         if (job?.id) {
-          void acceptRequestRpc(job.id, "t1").then((res) => {
+          void acceptRequestRpc(
+            job.id,
+            "4cbbcab2-4aad-4e8a-8d83-7dcdef3bd50a",
+          ).then((res) => {
             if (res.error) {
               console.warn("[dispatch] accept_request RPC error:", res.error)
             } else {
@@ -509,8 +549,11 @@ export function DispatchProvider({
         updateJob({
           status: "accepted",
           executionStep: "accepted",
-          technicianId: "t1",
-          technicianName: "Rahul Kumar",
+          technicianId: "4cbbcab2-4aad-4e8a-8d83-7dcdef3bd50a",
+          technicianName: "Kevin",
+          technicianVehicle: "Two-Wheeler / Scooter · UP 16 AB 1234",
+          technicianRating: 4.9,
+          technicianCategory: "AC Repair",
         })
       },
       declineRequest: () => updateJob({ status: "declined" }),

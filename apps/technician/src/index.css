@@ -92,3 +92,15 @@
 .technician-portal .bg-emerald-500\/10 {
 	background-color: #ecfdf5;
 }
+
+/* Accessible input contrast guarantees */
+.technician-portal input,
+.technician-portal select,
+.technician-portal textarea {
+	color: #0f172a !important;
+}
+
+.technician-portal input::placeholder,
+.technician-portal textarea::placeholder {
+	color: #94a3b8 !important;
+}

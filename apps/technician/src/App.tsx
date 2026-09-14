@@ -11,23 +11,23 @@ function TechnicianBroadcastIndicator() {
   const { isBroadcasting, isSimulating, currentCoordinates, toggleSimulation } = useTechnicianBroadcaster();
   if (!isBroadcasting) return null;
   return (
-    <div className="fixed bottom-3 right-3 z-[9999] flex items-center gap-2 rounded-full bg-slate-900/90 border border-emerald-500/40 px-3 py-1.5 text-xs text-slate-200 shadow-xl backdrop-blur-md">
+    <div className="fixed bottom-3 right-3 z-[9999] flex items-center gap-2 rounded-full bg-white/95 border border-slate-200 px-3 py-1.5 text-xs text-slate-800 shadow-xl backdrop-blur-md">
       <span className="relative flex h-2 w-2">
         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
       </span>
-      <span className="font-semibold text-emerald-400">
+      <span className="font-semibold text-emerald-600">
         {isSimulating ? 'Simulating Route' : 'GPS Live'}
       </span>
       {currentCoordinates && (
-        <span className="text-[10px] text-slate-400">
+        <span className="text-[10px] text-slate-500 font-mono">
           ({currentCoordinates.latitude.toFixed(4)}, {currentCoordinates.longitude.toFixed(4)})
         </span>
       )}
       <button
         type="button"
         onClick={toggleSimulation}
-        className="ml-1 rounded px-1.5 py-0.5 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+        className="ml-1 rounded px-1.5 py-0.5 text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-medium transition-colors"
       >
         {isSimulating ? 'Use Real GPS' : 'Simulate'}
       </button>
@@ -59,10 +59,10 @@ function TechnicianAppInner() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
-        <div className="flex flex-col items-center gap-3 text-slate-400">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-slate-800">
+        <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm font-medium">Connecting to Technician Dispatch Radar...</p>
+          <p className="text-sm font-medium text-slate-600">Connecting to Technician Dispatch Radar...</p>
         </div>
       </div>
     );
@@ -74,7 +74,7 @@ function TechnicianAppInner() {
         portal="technician"
         title="SewaSync Technician"
         subtitle="Sign in to see your live dispatch feed"
-        theme="dark"
+        theme="light"
         initialError={deniedMsg}
         onSuccess={() => setDeniedMsg(null)}
       />
@@ -87,7 +87,7 @@ function TechnicianAppInner() {
         portal="technician"
         title="SewaSync Technician"
         subtitle="Sign in to see your live dispatch feed"
-        theme="dark"
+        theme="light"
         initialError="ACCESS DENIED: Technician portal is restricted to registered technicians."
       />
     );

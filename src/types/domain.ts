@@ -150,6 +150,12 @@ export interface BookingRecord {
   estimatedTotal?: number;
   photos?: string[];
   rawStatus?: string;
+  addressText?: string;
+  addressNotes?: string;
+  addressLine?: string;
+  area?: string;
+  technicianId?: string;
+  technicianPhone?: string;
 }
 
 /** Maps to `request_status_events` rendered as a client-facing timeline. */

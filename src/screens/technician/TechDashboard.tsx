@@ -164,8 +164,8 @@ export default function TechDashboard({ onOpenAlerts, onOpenActive }: Props) {
       {/* Header Greeting & Real Date */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-sm text-slate-400">{formattedDate}</p>
-          <h1 className="mt-1 font-display text-3xl font-800 text-white">
+          <p className="text-sm text-slate-500">{formattedDate}</p>
+          <h1 className="mt-1 font-display text-3xl font-800 text-slate-900">
             {greeting}, {displayName}
           </h1>
         </div>
@@ -174,8 +174,8 @@ export default function TechDashboard({ onOpenAlerts, onOpenActive }: Props) {
           onClick={handleToggleOnline}
           className={`tech-online-pulse rounded-full px-4 py-2 text-sm font-700 shadow-md transition-all active:scale-95 ${
             technicianOnline
-              ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-emerald-500/20'
-              : 'bg-slate-800 hover:bg-slate-700 text-slate-400'
+              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
+              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
           }`}
         >
           {technicianOnline ? '● Online' : '○ Offline'}
@@ -184,33 +184,33 @@ export default function TechDashboard({ onOpenAlerts, onOpenActive }: Props) {
 
       {/* Live Authentic Aggregation Counters */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition-colors hover:border-slate-700">
-          <p className="text-sm text-slate-400 font-medium">Today&apos;s jobs</p>
-          <p className="mt-2 font-display text-2xl font-800 text-white">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-slate-300">
+          <p className="text-sm text-slate-500 font-medium">Today&apos;s jobs</p>
+          <p className="mt-2 font-display text-2xl font-800 text-slate-900">
             {isLoadingStats ? (
-              <span className="inline-block h-7 w-12 bg-slate-800 rounded animate-pulse" />
+              <span className="inline-block h-7 w-12 bg-slate-100 rounded animate-pulse" />
             ) : (
               todayJobsCount + (active ? 1 : 0)
             )}
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition-colors hover:border-slate-700">
-          <p className="text-sm text-slate-400 font-medium">Earnings</p>
-          <p className="mt-2 font-display text-2xl font-800 text-emerald-400">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-slate-300">
+          <p className="text-sm text-slate-500 font-medium">Earnings</p>
+          <p className="mt-2 font-display text-2xl font-800 text-emerald-600">
             {isLoadingStats ? (
-              <span className="inline-block h-7 w-16 bg-slate-800 rounded animate-pulse" />
+              <span className="inline-block h-7 w-16 bg-slate-100 rounded animate-pulse" />
             ) : (
               `₹${todayEarnings}`
             )}
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 transition-colors hover:border-slate-700">
-          <p className="text-sm text-slate-400 font-medium">Rating</p>
-          <p className="mt-2 font-display text-2xl font-800 text-amber-400">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-colors hover:border-slate-300">
+          <p className="text-sm text-slate-500 font-medium">Rating</p>
+          <p className="mt-2 font-display text-2xl font-800 text-amber-500">
             {isLoadingStats ? (
-              <span className="inline-block h-7 w-20 bg-slate-800 rounded animate-pulse" />
+              <span className="inline-block h-7 w-20 bg-slate-100 rounded animate-pulse" />
             ) : (
               ratingDisplay
             )}
@@ -223,18 +223,18 @@ export default function TechDashboard({ onOpenAlerts, onOpenActive }: Props) {
         <button
           type="button"
           onClick={onOpenAlerts}
-          className="w-full rounded-2xl border border-red-500/40 bg-red-500/10 p-5 text-left transition hover:bg-red-500/20 shadow-lg shadow-red-500/10 active:scale-[0.99]"
+          className="w-full rounded-2xl border border-red-200 bg-red-50 p-5 text-left transition hover:bg-red-100/70 shadow-sm active:scale-[0.99]"
         >
           <div className="flex items-center justify-between">
-            <p className="text-xs font-700 uppercase tracking-wider text-red-300">
+            <p className="text-xs font-700 uppercase tracking-wider text-red-700">
               New emergency dispatch request
             </p>
-            <span className="animate-ping h-2 w-2 rounded-full bg-red-400" />
+            <span className="animate-ping h-2 w-2 rounded-full bg-red-500" />
           </div>
-          <p className="mt-2 font-display text-xl font-800 text-white capitalize">
+          <p className="mt-2 font-display text-xl font-800 text-slate-900 capitalize">
             {job.service.replace('-', ' ')} emergency near {job.location.split(',')[0]}
           </p>
-          <p className="mt-1 text-sm text-slate-300">
+          <p className="mt-1 text-sm text-slate-600">
             Tap to open the Pre-Acceptance Inspection Drawer before the 45-second window expires.
           </p>
         </button>
@@ -245,30 +245,30 @@ export default function TechDashboard({ onOpenAlerts, onOpenActive }: Props) {
         <button
           type="button"
           onClick={onOpenActive}
-          className="w-full rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-5 text-left transition hover:bg-emerald-500/20 shadow-lg shadow-emerald-500/10 active:scale-[0.99]"
+          className="w-full rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-left transition hover:bg-emerald-100/70 shadow-sm active:scale-[0.99]"
         >
           <div className="flex items-center justify-between">
-            <p className="text-xs font-700 uppercase tracking-wider text-emerald-300">
+            <p className="text-xs font-700 uppercase tracking-wider text-emerald-700">
               Active job · {formatJobId(job.id)}
             </p>
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
           </div>
-          <p className="mt-2 font-display text-xl font-800 text-white capitalize">
+          <p className="mt-2 font-display text-xl font-800 text-slate-900 capitalize">
             {job.service.replace('-', ' ')} · {job.location}
           </p>
-          <p className="mt-1 text-sm text-slate-300">
-            Current status: <strong className="text-emerald-400 uppercase text-xs">{job.status}</strong>
+          <p className="mt-1 text-sm text-slate-600">
+            Current status: <strong className="text-emerald-700 uppercase text-xs">{job.status}</strong>
           </p>
         </button>
       )}
 
       {/* Standby Empty State */}
       {!alert && !active && (
-        <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 p-12 text-center text-slate-400">
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-12 text-center text-slate-500 shadow-sm">
           <p className="text-3xl mb-2">📡</p>
-          <p className="font-semibold text-slate-300">You are online and ready for the next dispatch.</p>
+          <p className="font-semibold text-slate-800">You are online and ready for the next dispatch.</p>
           <p className="text-xs text-slate-500 mt-1">
-            New emergency requests within your 10 km operating zone will appear here immediately.
+            New emergency requests within your 20 km operating zone will appear here immediately.
           </p>
         </div>
       )}

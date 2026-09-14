@@ -43,7 +43,7 @@
 
 | Type | Values | Used by |
 |---|---|---|
-| `user_role` | `client`, `technician` | `users.role` — staff are **not** represented here |
+| `user_role` | `client`, `technician`, `admin` | `users.role` |
 | `staff_role` | `support_moderator`, `super_admin` | `platform_staff.staff_role` |
 | `request_status` | `pending`, `accepted`, `en_route`, `arrived`, `in_progress`, `completed`, `cancelled`, `declined`, `unfulfilled` | `requests`, `request_status_events` |
 | `request_priority` | `low`, `medium`, `high` | `requests.priority` |
@@ -350,6 +350,7 @@ erDiagram
 | `search_radius_km` | `INTEGER` | NOT NULL | `10` | CHECK BETWEEN 10 AND 30 |
 | `radius_expanded_at` | `TIMESTAMPTZ` | NULL | — | Sweep cursor |
 | `superseded_from_request_id` | `UUID` | NULL | — | FK → `requests(id)` ON DELETE SET NULL; re-dispatch lineage |
+| `cancellation_reason` | `TEXT` | NULL | — | Populated on cancellation |
 | `execution_window` | `TSTZRANGE` GENERATED STORED | derived | — | See §9.1 |
 | `created_at` / `updated_at` | `TIMESTAMPTZ` | NOT NULL | `now()` | — |
 
@@ -374,6 +375,7 @@ erDiagram
 | `actor_id` | `UUID` | NULL | — | Resolved against `users` or `platform_staff` per `actor_role` |
 | `actor_role` | `actor_role` | NOT NULL | — | Disambiguates `actor_id` |
 | `reason` | `status_event_reason` | NULL | — | Populated on cancellation/decline |
+| `notes` | `TEXT` | NULL | — | Context or cancellation notes |
 | `occurred_at` | `TIMESTAMPTZ` | NOT NULL | `now()` | — |
 
 *Rationale*: append-only audit. Trigger-written; no participant `INSERT` policy exists. Backs the service timeline, elapsed-duration computation and the invoice time range.
@@ -804,6 +806,16 @@ All functions: `SECURITY DEFINER`, `SET search_path = public`, `READ COMMITTED` 
 | Preconditions | Caller authenticated |
 | Effects (atomic) | Sets `users.role='technician'`; inserts `technician_profiles`; inserts 1–3 `technician_categories`; initializes `technician_locations` at base coordinates |
 | Exceptions | `not_authenticated`, `category_count_out_of_bounds` |
+
+### 11.7 `cancel_request(p_request_id, p_reason)`
+
+| Aspect | Specification |
+|---|---|
+| Returns | Updated `requests` row |
+| Locking | `SELECT … FOR UPDATE` on target request |
+| Preconditions | Caller is participant (`client_id` or `technician_id`) or staff; request `status in ('pending', 'accepted', 'en_route')` |
+| Effects | Sets `status='cancelled'`, writes `cancellation_reason`, triggers status event logging and participant notification |
+| Exceptions | `request_not_found`, `invalid_transition_cannot_cancel_in_current_state`, `not_authorized_to_cancel` |
 
 ---
 

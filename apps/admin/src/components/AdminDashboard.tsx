@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import DisputeMediationPanel from './DisputeMediationPanel';
 import TechnicianComplianceRegistry from './TechnicianComplianceRegistry';
 import OperationsMetricsView from './OperationsMetricsView';
 import { supabase } from '../../../../packages/shared/src/lib/supabase';
 import { useAuth } from '../../../../packages/shared/src/auth';
+import { useAdminRealtime } from '../hooks/useAdminRealtime';
 
-type AdminTab = 'mediator' | 'compliance' | 'metrics';
+export type AdminTab = 'mediator' | 'compliance' | 'metrics';
 
 interface AdminDashboardProps {
   onBack?: () => void;
@@ -37,80 +38,65 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
     loading: true,
   });
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadLiveMetrics = useCallback(async () => {
+    try {
+      const [reqRes, usersRes, invRes, dispRes] = await Promise.all([
+        supabase.from('requests').select('status, final_price, estimated_total'),
+        supabase.from('users').select('id', { count: 'exact', head: true }),
+        supabase.from('invoices').select('total'),
+        supabase.from('disputes').select('status'),
+      ]);
 
-    async function loadLiveMetrics() {
-      try {
-        const [reqRes, usersRes, invRes, dispRes] = await Promise.all([
-          supabase.from('requests').select('status, final_price, estimated_total'),
-          supabase.from('users').select('id', { count: 'exact', head: true }),
-          supabase.from('invoices').select('total'),
-          supabase.from('disputes').select('status'),
-        ]);
+      const requests = reqRes.data || [];
+      const nonTerminal = ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'];
+      const activeRequests = requests.filter((r) => nonTerminal.includes(r.status)).length;
+      const completedRequests = requests.filter((r) => r.status === 'completed').length;
 
-        if (cancelled) return;
+      const totalUsers = usersRes.count ?? 0;
+      const invoices = invRes.data || [];
+      const totalRevenue = invoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
 
-        const requests = reqRes.data || [];
-        const nonTerminal = ['pending', 'accepted', 'en_route', 'arrived', 'in_progress'];
-        const activeRequests = requests.filter((r) => nonTerminal.includes(r.status)).length;
-        const completedRequests = requests.filter((r) => r.status === 'completed').length;
+      const disputes = dispRes.data || [];
+      const pendingDisputes = disputes.filter((d) => d.status === 'under_review' || d.status === 'open').length;
 
-        const totalUsers = usersRes.count ?? 0;
-        const invoices = invRes.data || [];
-        const totalRevenue = invoices.reduce((sum, inv) => sum + Number(inv.total || 0), 0);
-
-        const disputes = dispRes.data || [];
-        const pendingDisputes = disputes.filter((d) => d.status === 'under_review').length;
-
-        setMetrics({
-          totalRequests: requests.length,
-          activeRequests,
-          completedRequests,
-          totalUsers,
-          totalInvoices: invoices.length,
-          totalRevenue,
-          pendingDisputes,
-          loading: false,
-        });
-      } catch (err) {
-        console.error('[admin] failed to fetch live overview metrics:', err);
-        if (!cancelled) setMetrics((m) => ({ ...m, loading: false }));
-      }
+      setMetrics({
+        totalRequests: requests.length,
+        activeRequests,
+        completedRequests,
+        totalUsers,
+        totalInvoices: invoices.length,
+        totalRevenue,
+        pendingDisputes,
+        loading: false,
+      });
+    } catch (err) {
+      console.error('[admin] failed to fetch live overview metrics:', err);
+      setMetrics((m) => ({ ...m, loading: false }));
     }
-
-    void loadLiveMetrics();
-
-    // Listen to changes on requests, invoices, and disputes
-    const channel = supabase
-      .channel('admin-overview-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, () => {
-        void loadLiveMetrics();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
-        void loadLiveMetrics();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'disputes' }, () => {
-        void loadLiveMetrics();
-      })
-      .subscribe();
-
-    return () => {
-      cancelled = true;
-      void supabase.removeChannel(channel);
-    };
   }, []);
+
+  useEffect(() => {
+    void loadLiveMetrics();
+  }, [loadLiveMetrics]);
+
+  // Realtime subscription via useAdminRealtime
+  useAdminRealtime({
+    tables: ['requests', 'disputes', 'invoices'],
+    onChange: () => {
+      void loadLiveMetrics();
+    },
+  });
 
   const supervisorName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Azaan Sheikh';
   const displayRole = staffRole || role || 'super_admin';
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
+    <div className="min-h-screen bg-[#F4F7FB] text-slate-900">
       {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-900/95 backdrop-blur-sm">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-sm shadow-xs">
+        <div className="max-w-6xl mx-auto px-4 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center font-700 text-white shadow-sm">
+            <div className="w-9 h-9 rounded-xl bg-sky-600 flex items-center justify-center font-700 text-white shadow-xs">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
@@ -122,14 +108,14 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="font-display font-800 text-base text-white">SewaSync Ops Control</h1>
-                <span className="rounded-full bg-emerald-500/10 text-emerald-400 px-2 py-0.5 text-[10px] font-700 uppercase">
-                  Port 3003 · Isolated
+                <h1 className="font-display font-800 text-base text-[#0B132B]">SewaSync Ops Control</h1>
+                <span className="rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-[10px] font-700 uppercase">
+                  Port 3003 · Live
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
-                Supervisor: <span className="text-slate-300 font-medium">{supervisorName}</span> · Role:{' '}
-                <span className="text-blue-500 font-medium">{displayRole}</span>
+              <p className="text-xs text-slate-500">
+                Supervisor: <span className="text-slate-800 font-semibold">{supervisorName}</span> · Role:{' '}
+                <span className="text-sky-600 font-semibold uppercase">{displayRole}</span>
               </p>
             </div>
           </div>
@@ -137,9 +123,9 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
           <div className="flex items-center gap-3">
             <button
               onClick={() => void signOut()}
-              className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-700 text-slate-300 hover:bg-slate-800 transition-colors flex items-center gap-2"
+              className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-700 text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-xs"
             >
-              <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -152,7 +138,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
             {onBack && (
               <button
                 onClick={onBack}
-                className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-700 text-slate-300 hover:bg-slate-800 transition-colors"
+                className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-700 text-slate-700 hover:bg-slate-50 transition-colors shadow-xs"
               >
                 Back
               </button>
@@ -163,148 +149,148 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
 
       {/* Main Operations Body */}
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        {/* Real Overview Metric Highlights */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-            <p className="text-xs text-slate-400">Total System Requests</p>
-            <p className="font-display font-800 text-2xl text-white mt-1">
+        {/* Top 4 KPI Metrics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white border border-slate-200 shadow-xs rounded-2xl p-5">
+            <p className="text-xs font-semibold text-slate-500">Total System Requests</p>
+            <p className="font-display font-900 text-3xl text-slate-900 mt-1">
               {metrics.loading ? '—' : metrics.totalRequests}
             </p>
-            <p className="text-[11px] text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-500 mt-1 font-medium">
               {metrics.activeRequests} active · {metrics.completedRequests} completed
             </p>
           </div>
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-            <p className="text-xs text-slate-400">Registered Users</p>
-            <p className="font-display font-800 text-2xl text-white mt-1">
+          <div className="bg-white border border-slate-200 shadow-xs rounded-2xl p-5">
+            <p className="text-xs font-semibold text-slate-500">Registered Users</p>
+            <p className="font-display font-900 text-3xl text-slate-900 mt-1">
               {metrics.loading ? '—' : metrics.totalUsers}
             </p>
-            <p className="text-[11px] text-emerald-400 mt-0.5">Verified participants</p>
+            <p className="text-xs text-emerald-600 mt-1 font-semibold">Verified participants</p>
           </div>
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-            <p className="text-xs text-slate-400">Settled Invoices</p>
-            <p className="font-display font-800 text-2xl text-white mt-1">
+          <div className="bg-white border border-slate-200 shadow-xs rounded-2xl p-5">
+            <p className="text-xs font-semibold text-slate-500">Settled Invoices</p>
+            <p className="font-display font-900 text-3xl text-slate-900 mt-1">
               {metrics.loading ? '—' : metrics.totalInvoices}
             </p>
-            <p className="text-[11px] text-slate-500 mt-0.5">₹{metrics.totalRevenue.toFixed(0)} total volume</p>
+            <p className="text-xs text-slate-500 mt-1 font-medium">₹{metrics.totalRevenue.toFixed(0)} total volume</p>
           </div>
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-            <p className="text-xs text-slate-400">Pending Disputes</p>
-            <p className="font-display font-800 text-2xl text-amber-400 mt-1">
+          <div className="bg-white border border-slate-200 shadow-xs rounded-2xl p-5">
+            <p className="text-xs font-semibold text-slate-500">Pending Disputes</p>
+            <p className="font-display font-900 text-3xl text-amber-600 mt-1">
               {metrics.loading ? '—' : metrics.pendingDisputes}
             </p>
-            <p className="text-[11px] text-slate-500 mt-0.5">Escrow arbitration</p>
+            <p className="text-xs text-slate-500 mt-1 font-medium">Escrow arbitration</p>
           </div>
         </div>
 
-        {/* KPI Quick-Access Banners */}
+        {/* Unified Module Selector Cards (Redundancies eliminated: acts as primary navigation) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
+            type="button"
             onClick={() => setActiveTab('mediator')}
-            className={`p-4 rounded-2xl border text-left transition-colors ${
+            className={`p-5 rounded-2xl text-left transition-all cursor-pointer ${
               activeTab === 'mediator'
-                ? 'border-blue-600 bg-slate-900 shadow-sm'
-                : 'border-slate-800 bg-slate-900/95 hover:bg-slate-900'
+                ? 'bg-[#0B132B] text-white border-2 border-sky-400 shadow-md ring-2 ring-sky-400/20'
+                : 'bg-white text-slate-800 border border-slate-200 hover:border-sky-300 shadow-xs'
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400 font-medium">The Mediator</span>
-              <span className="rounded-full bg-red-500/10 text-red-500 px-2 py-0.5 text-[10px] font-700">
+              <span className={`text-xs font-bold uppercase tracking-wider ${activeTab === 'mediator' ? 'text-sky-300' : 'text-slate-500'}`}>
+                Module 1 · The Mediator
+              </span>
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${
+                  activeTab === 'mediator'
+                    ? 'bg-rose-500/20 text-rose-300 border-rose-400/30'
+                    : 'bg-rose-50 text-rose-700 border-rose-200'
+                }`}
+              >
                 {metrics.pendingDisputes} Pending
               </span>
             </div>
-            <p className="font-display font-800 text-xl text-white mt-1">Escrow &amp; Disputes</p>
-            <p className="text-xs text-slate-400 mt-1">Arbitration &amp; liability determination</p>
+            <p className={`font-display font-800 text-xl mt-2 ${activeTab === 'mediator' ? 'text-white' : 'text-[#0B132B]'}`}>
+              Escrow &amp; Disputes
+            </p>
+            <p className={`text-xs mt-1 ${activeTab === 'mediator' ? 'text-slate-300' : 'text-slate-500'}`}>
+              Arbitration &amp; dual-party timeline reconstruction
+            </p>
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveTab('compliance')}
-            className={`p-4 rounded-2xl border text-left transition-colors ${
+            className={`p-5 rounded-2xl text-left transition-all cursor-pointer ${
               activeTab === 'compliance'
-                ? 'border-blue-600 bg-slate-900 shadow-sm'
-                : 'border-slate-800 bg-slate-900/95 hover:bg-slate-900'
+                ? 'bg-[#0B132B] text-white border-2 border-sky-400 shadow-md ring-2 ring-sky-400/20'
+                : 'bg-white text-slate-800 border border-slate-200 hover:border-sky-300 shadow-xs'
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400 font-medium">The Controller</span>
-              <span className="rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-[10px] font-700">
+              <span className={`text-xs font-bold uppercase tracking-wider ${activeTab === 'compliance' ? 'text-sky-300' : 'text-slate-500'}`}>
+                Module 2 · The Controller
+              </span>
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${
+                  activeTab === 'compliance'
+                    ? 'bg-sky-400/20 text-sky-200 border-sky-400/30'
+                    : 'bg-sky-50 text-sky-700 border-sky-200'
+                }`}
+              >
                 Audit Registry
               </span>
             </div>
-            <p className="font-display font-800 text-xl text-white mt-1">KYC &amp; Fatigue Registry</p>
-            <p className="text-xs text-slate-400 mt-1">Aadhaar, tooling &amp; shift caps</p>
+            <p className={`font-display font-800 text-xl mt-2 ${activeTab === 'compliance' ? 'text-white' : 'text-[#0B132B]'}`}>
+              KYC &amp; Fatigue Registry
+            </p>
+            <p className={`text-xs mt-1 ${activeTab === 'compliance' ? 'text-slate-300' : 'text-slate-500'}`}>
+              Aadhaar, tooling &amp; dynamic shift caps
+            </p>
           </button>
 
           <button
+            type="button"
             onClick={() => setActiveTab('metrics')}
-            className={`p-4 rounded-2xl border text-left transition-colors ${
+            className={`p-5 rounded-2xl text-left transition-all cursor-pointer ${
               activeTab === 'metrics'
-                ? 'border-blue-600 bg-slate-900 shadow-sm'
-                : 'border-slate-800 bg-slate-900/95 hover:bg-slate-900'
+                ? 'bg-[#0B132B] text-white border-2 border-sky-400 shadow-md ring-2 ring-sky-400/20'
+                : 'bg-white text-slate-800 border border-slate-200 hover:border-sky-300 shadow-xs'
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400 font-medium">The Analyzer</span>
-              <span className="rounded-full bg-emerald-500/10 text-emerald-400 px-2 py-0.5 text-[10px] font-700">
+              <span className={`text-xs font-bold uppercase tracking-wider ${activeTab === 'metrics' ? 'text-sky-300' : 'text-slate-500'}`}>
+                Module 3 · The Analyzer
+              </span>
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold border ${
+                  activeTab === 'metrics'
+                    ? 'bg-emerald-400/20 text-emerald-200 border-emerald-400/30'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                }`}
+              >
                 Live Data
               </span>
             </div>
-            <p className="font-display font-800 text-xl text-white mt-1">Fares &amp; Collusion Guard</p>
-            <p className="text-xs text-slate-400 mt-1">Fare variance &amp; photo audits</p>
-          </button>
-        </div>
-
-        {/* Pillar Tab Controls */}
-        <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-4">
-          <button
-            onClick={() => setActiveTab('mediator')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-700 transition-colors flex items-center gap-2 ${
-              activeTab === 'mediator'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800'
-            }`}
-          >
-            <span>⚖️</span>
-            <span>1. The Mediator (Disputes)</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('compliance')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-700 transition-colors flex items-center gap-2 ${
-              activeTab === 'compliance'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800'
-            }`}
-          >
-            <span>🛡️</span>
-            <span>2. The Controller (Compliance &amp; Fatigue)</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('metrics')}
-            className={`px-4 py-2.5 rounded-xl text-xs font-700 transition-colors flex items-center gap-2 ${
-              activeTab === 'metrics'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800'
-            }`}
-          >
-            <span>📊</span>
-            <span>3. The Analyzer &amp; Business Guard</span>
+            <p className={`font-display font-800 text-xl mt-2 ${activeTab === 'metrics' ? 'text-white' : 'text-[#0B132B]'}`}>
+              Fares &amp; Collusion Guard
+            </p>
+            <p className={`text-xs mt-1 ${activeTab === 'metrics' ? 'text-slate-300' : 'text-slate-500'}`}>
+              Real-time fare variance &amp; pairwise anomaly audits
+            </p>
           </button>
         </div>
 
         {/* Active Pillar Panel */}
-        <div>
+        <div className="transition-opacity duration-200">
           {activeTab === 'mediator' && <DisputeMediationPanel />}
           {activeTab === 'compliance' && <TechnicianComplianceRegistry />}
           {activeTab === 'metrics' && <OperationsMetricsView />}
         </div>
 
         {/* Global Operational Security Notice */}
-        <footer className="border-t border-slate-800 pt-4 text-center">
+        <footer className="border-t border-slate-200 pt-4 text-center">
           <p className="text-xs text-slate-500">
             SewaSync Operations Platform · Immutable Audit Log · All operator actions recorded into{' '}
-            <code className="text-slate-400 font-medium">admin_actions</code> with mandatory justification.
+            <code className="text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded-md font-mono text-[11px]">admin_actions</code> with mandatory justification.
           </p>
         </footer>
       </main>

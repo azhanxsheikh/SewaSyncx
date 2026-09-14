@@ -1,43 +1,73 @@
-import { useState } from 'react';
-import type { Screen } from '../../types/navigation';
-import { usePrimaryTechnician } from '../../hooks/useTechnicians';
-import { useReviewOptions } from '../../hooks/useBilling';
+import { useState } from "react"
+import type { Screen } from "../../types/navigation"
+import { useTechnicianProfile } from "../../hooks/useTechnicians"
+import { useReviewOptions } from "../../hooks/useBilling"
+import { useDispatch } from "../../context/DispatchContext"
 
 interface Props {
-  navigate: (s: Screen) => void;
+  navigate: (s: Screen) => void
 }
 
 export default function Rating({ navigate }: Props) {
-  const tech = usePrimaryTechnician();
-  const { ratingLabels, reviewTags: tags, tipOptions } = useReviewOptions();
-  const [rating, setRating] = useState(0);
-  const [hoverRating, setHoverRating] = useState(0);
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [review, setReview] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+  const { job } = useDispatch()
+  const techProfile = useTechnicianProfile(job?.technicianId)
+  const techName = job?.technicianName || techProfile?.name || "Kevin"
+  const techPhoto =
+    job?.technicianPhoto ||
+    techProfile?.photo ||
+    "https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=150"
+  const serviceName =
+    job?.technicianCategory ||
+    (job?.service
+      ? job.service.replace("-", " ").replace(/\b\w/g, (c) => c.toUpperCase())
+      : "AC Repair")
 
-  const toggleTag = (t: string) => setSelectedTags(p => p.includes(t) ? p.filter(x => x !== t) : [...p, t]);
+  const { ratingLabels, reviewTags: tags, tipOptions } = useReviewOptions()
+  const [rating, setRating] = useState(0)
+  const [hoverRating, setHoverRating] = useState(0)
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [review, setReview] = useState("")
+  const [submitted, setSubmitted] = useState(false)
+
+  const toggleTag = (t: string) =>
+    setSelectedTags((p) =>
+      p.includes(t) ? p.filter((x) => x !== t) : [...p, t],
+    )
 
   const handleSubmit = () => {
-    setSubmitted(true);
-    setTimeout(() => navigate('home'), 2500);
-  };
+    setSubmitted(true)
+    setTimeout(() => navigate("home"), 2500)
+  }
 
-  const displayRating = hoverRating || rating;
+  const displayRating = hoverRating || rating
 
   if (submitted) {
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center px-6 text-center">
         <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center mb-6">
-          <svg className="w-12 h-12 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          <svg
+            className="w-12 h-12 text-emerald-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M5 13l4 4L19 7"
+            />
           </svg>
         </div>
-        <h2 className="font-display font-800 text-2xl text-gray-900 mb-2">Thank you!</h2>
-        <p className="text-gray-500 text-sm">Your review helps other customers choose verified professionals.</p>
+        <h2 className="font-display font-800 text-2xl text-gray-900 mb-2">
+          Thank you!
+        </h2>
+        <p className="text-gray-500 text-sm">
+          Your review helps other customers choose verified professionals.
+        </p>
         <p className="text-gray-400 text-xs mt-2">Redirecting to home...</p>
       </div>
-    );
+    )
   }
 
   return (
@@ -46,16 +76,24 @@ export default function Rating({ navigate }: Props) {
       <div className="bg-white border-b border-gray-100 px-4 py-4">
         <div className="max-w-md mx-auto text-center">
           <p className="text-gray-500 text-sm">Service completed</p>
-          <h2 className="font-display font-800 text-xl text-gray-900 mt-0.5">How was your experience?</h2>
+          <h2 className="font-display font-800 text-xl text-gray-900 mt-0.5">
+            How was your experience?
+          </h2>
         </div>
       </div>
 
       <div className="flex-1 px-4 pt-6 pb-28 max-w-md mx-auto w-full">
         {/* Technician */}
         <div className="flex flex-col items-center mb-8">
-          <img src={tech.photo} alt={tech.name} className="w-20 h-20 rounded-full object-cover ring-4 ring-gray-100 mb-3" />
-          <p className="font-display font-700 text-gray-900 text-lg">{tech.name}</p>
-          <p className="text-sm text-gray-500">Electrician · Electrical Repair</p>
+          <img
+            src={techPhoto}
+            alt={techName}
+            className="w-20 h-20 rounded-full object-cover ring-4 ring-gray-100 mb-3"
+          />
+          <p className="font-display font-700 text-gray-900 text-lg">
+            {techName}
+          </p>
+          <p className="text-sm text-gray-500">{serviceName}</p>
         </div>
 
         {/* Star rating */}
@@ -69,19 +107,29 @@ export default function Rating({ navigate }: Props) {
                 onClick={() => setRating(star)}
                 className="text-4xl transition-transform hover:scale-110 active:scale-95"
               >
-                <span className={displayRating >= star ? 'text-amber-400' : 'text-gray-200'}>★</span>
+                <span
+                  className={
+                    displayRating >= star ? "text-amber-400" : "text-gray-200"
+                  }
+                >
+                  ★
+                </span>
               </button>
             ))}
           </div>
           {displayRating > 0 && (
-            <p className="text-gray-600 font-600 text-sm fade-in">{ratingLabels[displayRating]}</p>
+            <p className="text-gray-600 font-600 text-sm fade-in">
+              {ratingLabels[displayRating]}
+            </p>
           )}
         </div>
 
         {/* Tags */}
         {rating > 0 && (
           <div className="mb-6 fade-in">
-            <p className="font-display font-700 text-gray-900 text-sm mb-3">What did you like?</p>
+            <p className="font-display font-700 text-gray-900 text-sm mb-3">
+              What did you like?
+            </p>
             <div className="flex flex-wrap gap-2">
               {tags.map((t) => (
                 <button
@@ -89,8 +137,8 @@ export default function Rating({ navigate }: Props) {
                   onClick={() => toggleTag(t)}
                   className={`px-3 py-2 rounded-xl text-sm font-500 border transition-all ${
                     selectedTags.includes(t)
-                      ? 'bg-blue-600 text-white border-blue-600'
-                      : 'bg-white text-gray-700 border-gray-200 hover:border-blue-300'
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-gray-700 border-gray-200 hover:border-blue-300"
                   }`}
                 >
                   {t}
@@ -103,7 +151,10 @@ export default function Rating({ navigate }: Props) {
         {/* Text review */}
         {rating > 0 && (
           <div className="mb-6 fade-in">
-            <p className="font-display font-700 text-gray-900 text-sm mb-2">Write a review <span className="text-gray-400 font-400">(optional)</span></p>
+            <p className="font-display font-700 text-gray-900 text-sm mb-2">
+              Write a review{" "}
+              <span className="text-gray-400 font-400">(optional)</span>
+            </p>
             <textarea
               value={review}
               onChange={(e) => setReview(e.target.value)}
@@ -117,7 +168,9 @@ export default function Rating({ navigate }: Props) {
         {/* Tip */}
         {rating >= 4 && (
           <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 mb-4 fade-in">
-            <p className="font-600 text-amber-800 text-sm mb-2">Leave a tip for Rahul? 🙏</p>
+            <p className="font-600 text-amber-800 text-sm mb-2">
+              Leave a tip for {techName}? 🙏
+            </p>
             <div className="flex gap-2">
               {tipOptions.map((tip) => (
                 <button
@@ -139,17 +192,20 @@ export default function Rating({ navigate }: Props) {
             disabled={rating === 0}
             className={`w-full py-4 rounded-xl font-display font-700 text-base transition-all active:scale-[0.98] ${
               rating > 0
-                ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-200'
-                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                ? "bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-200"
+                : "bg-gray-100 text-gray-400 cursor-not-allowed"
             }`}
           >
             Submit Review
           </button>
-          <button onClick={() => navigate('home')} className="w-full text-gray-400 text-sm py-2">
+          <button
+            onClick={() => navigate("home")}
+            className="w-full text-gray-400 text-sm py-2"
+          >
             Skip
           </button>
         </div>
       </div>
     </div>
-  );
+  )
 }

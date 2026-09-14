@@ -48,7 +48,7 @@ export default function IncomingAlert({
 
   if (!job || !isAlert) {
     return (
-      <div className="rounded-2xl border border-slate-800 bg-slate-900 p-12 text-center text-slate-400">
+      <div className="rounded-2xl border border-slate-200 bg-white p-12 text-center text-slate-500 shadow-sm">
         No incoming requests right now.
       </div>
     )
@@ -75,10 +75,10 @@ export default function IncomingAlert({
     <div className="mx-auto max-w-2xl space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold text-red-400">Emergency dispatch request</p>
-          <h1 className="font-display text-3xl font-800 text-white">Review and respond</h1>
+          <p className="text-sm font-semibold text-red-600">Emergency dispatch request</p>
+          <h1 className="font-display text-3xl font-800 text-slate-900">Review and respond</h1>
         </div>
-        <div className="relative flex h-20 w-20 items-center justify-center text-red-400">
+        <div className="relative flex h-20 w-20 items-center justify-center text-red-600">
           <svg
             className="absolute inset-0 h-full w-full -rotate-90"
             viewBox="0 0 100 100"
@@ -109,54 +109,54 @@ export default function IncomingAlert({
       </div>
 
       {acceptError && (
-        <div className="rounded-xl border border-red-500/40 bg-red-950/50 p-4 text-sm text-red-200">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <p className="font-bold">Unable to claim emergency job:</p>
-          <p className="text-xs text-red-300 mt-1">{acceptError}</p>
+          <p className="text-xs text-red-600 mt-1">{acceptError}</p>
         </div>
       )}
 
       {/* Tap-to-Inspect Interactive Alert Card */}
       <div
         onClick={() => setIsDrawerOpen(true)}
-        className="group cursor-pointer overflow-hidden rounded-2xl border border-slate-700 bg-slate-900 transition-all hover:border-red-500/60 hover:shadow-xl hover:shadow-red-500/10"
+        className="group cursor-pointer overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:border-red-400 hover:shadow-xl"
       >
-        <div className="bg-red-500/10 p-5 border-b border-slate-800 group-hover:bg-red-500/15 transition-colors">
+        <div className="bg-red-50 p-5 border-b border-red-100 group-hover:bg-red-100/50 transition-colors">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-700 uppercase tracking-wider text-red-300">
+            <span className="text-xs font-700 uppercase tracking-wider text-red-700">
               {job.priority} priority
             </span>
-            <span className="text-xs font-bold text-emerald-400 bg-emerald-950/70 border border-emerald-500/30 px-2.5 py-1 rounded-full">
+            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-300 px-2.5 py-1 rounded-full">
               ₹{job.estimatedTotal}
             </span>
           </div>
-          <h2 className="mt-2 font-display text-2xl font-800 capitalize text-white">
+          <h2 className="mt-2 font-display text-2xl font-800 capitalize text-slate-900">
             {job.service.replace("-", " ")} emergency
           </h2>
           <div className="mt-2 flex items-center gap-2">
-            <span className="text-xs px-2 py-0.5 rounded font-bold bg-slate-800 text-slate-200 border border-slate-700">
+            <span className="text-xs px-2 py-0.5 rounded font-bold bg-slate-100 text-slate-700 border border-slate-200">
               {destination.badge}
             </span>
-            <p className="text-sm font-medium text-slate-300 truncate">{job.location}</p>
+            <p className="text-sm font-medium text-slate-700 truncate">{job.location}</p>
           </div>
         </div>
 
         <div className="p-5 space-y-3 text-sm">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Customer: <strong className="text-slate-200">{job.customerName}</strong></span>
+          <div className="flex items-center justify-between text-xs text-slate-500">
+            <span>Customer: <strong className="text-slate-800">{job.customerName}</strong></span>
             {job.symptoms?.length > 0 && (
-              <span className="text-emerald-400 font-medium">✓ {job.symptoms.length} symptoms noted</span>
+              <span className="text-emerald-700 font-medium">✓ {job.symptoms.length} symptoms noted</span>
             )}
           </div>
 
           {job.landmarkAndInstructions && (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-3 text-xs text-amber-200">
-              <span className="font-bold text-amber-400">🚩 Landmark: </span>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              <span className="font-bold text-amber-800">🚩 Landmark: </span>
               {job.landmarkAndInstructions}
             </div>
           )}
 
           {/* Interactive Inspection CTA */}
-          <div className="pt-2 flex items-center justify-between text-xs font-bold text-red-400 group-hover:text-red-300">
+          <div className="pt-2 flex items-center justify-between text-xs font-bold text-red-600 group-hover:text-red-700">
             <span>Tap to open Pre-Acceptance Inspection Drawer</span>
             <span className="text-base group-hover:translate-x-1 transition-transform">→</span>
           </div>
@@ -167,7 +167,7 @@ export default function IncomingAlert({
         <button
           type="button"
           onClick={handleDecline}
-          className="rounded-xl border border-slate-700 py-4 font-700 text-slate-300 hover:bg-slate-800 transition-colors"
+          className="rounded-xl border border-slate-200 bg-white py-4 font-700 text-slate-700 hover:bg-slate-50 transition-colors shadow-sm"
         >
           Decline
         </button>
